@@ -1,0 +1,154 @@
+module Core = file "lib/core/core.mor"
+  expose {
+    module Io expose { writeln },
+    module String expose { concat, int_to_string, string_to_nat, equal},
+    module Option expose { Option { Some, None } },
+    module Iter,
+    module Array expose {slice},
+  }
+module Bench = file "lib/bench_common.mor" with { Core }
+  expose { repeat }
+
+type Regex {
+  Literal(Array Byte),
+  Wildcard,
+  Repeat(Regex),
+  OneOrMore(Regex),
+  Sequence(Array Regex),
+  AnchorStart,
+  AnchorEnd,
+}
+
+//dup("hello")
+rec_match(state: (Int, Array Regex, Array Byte)): Option Int =
+  let (pos, regs, input) = state in
+  if len(regs) = 0 {
+    Some(pos)
+  } else {
+    match match_regex(Array.get(regs, 0), input, pos) {
+      Some(next_pos) ->
+        let new_state = (next_pos, Array.slice(regs, 1, len(regs)), input) in
+        rec_match(new_state),
+      None -> None,
+    }
+  }
+
+
+rec_helper(state: (Int, Regex, Array Byte)): Int =
+  let (pos, subregex, input) = state in
+  match match_regex(subregex, input, pos) {
+    Some(next_pos) -> rec_helper((next_pos, subregex, input)),
+    None -> pos, // Stop recursion and return the current position if no match is found
+  }
+
+match_regex(regex: Regex, input: Array Byte, start: Int): Option Int =
+  match regex {
+    Literal(lit) ->
+      if Array.equal(slice(input, start, start + len(lit)), lit, \(x, y) -> x =& y) {
+        Some(start + len(lit))
+      } else {
+        None
+      },
+
+    Wildcard ->
+      if start < len(input) {
+        Some(start + 1)
+      } else {
+        None
+      },
+  Repeat(subregex) ->
+      // Use the helper function to handle repeated matches
+      let helper_result = rec_helper((start, subregex, input)) in
+      Some(helper_result),
+
+    OneOrMore(subregex) ->
+      match match_regex(subregex, input, start) {
+        Some(next_pos) ->
+          match match_regex(Repeat(subregex), input, next_pos) {
+            Some(final_pos) -> Some(final_pos),
+            None -> Some(next_pos),
+          },
+        None -> None,
+      },
+
+    Sequence(regexes) ->
+      rec_match((start, regexes, input)),
+
+    AnchorStart ->
+      if start = 0 {
+        Some(start)
+      } else {
+        None
+      },
+
+    AnchorEnd ->
+      if start = len(input) {
+        Some(start)
+      } else {
+        None
+      },
+  }
+
+is_match(regex: Regex, input: Array Byte): Bool =
+  match match_regex(Sequence(Array.from_iter(Iter.items([AnchorStart, regex, AnchorEnd]))), input, 0) {
+    Some(_) -> True,
+    None -> False,
+  }
+
+//test_regex(n: Int): Int =
+//  let regex = Literal(Array.from_iter(Iter.items("hello"))) in
+//  let input = "hello" in
+// let result = is_match(regex, Array.from_iter(Iter.items(input))) in
+//  if result { 8 } else { 0 }
+
+test_regex(n: Int): Int =
+  let cases = Array.from_iter(Iter.items([
+    (Literal(Array.from_iter(Iter.items("hello"))), "hello", 1),
+  (Literal(Array.from_iter(Iter.items("hello"))), "world", 0),
+    (Sequence(Array.from_iter(Iter.items([
+     Literal(Array.from_iter(Iter.items("h"))),
+     Wildcard,
+     Literal(Array.from_iter(Iter.items("llo"))),
+    ]))), "hello", 1),
+    (Repeat(Literal(Array.from_iter(Iter.items("a")))), "aaaa", 1),
+    (OneOrMore(Literal(Array.from_iter(Iter.items("a")))), "a", 1),
+    (OneOrMore(Literal(Array.from_iter(Iter.items("a")))), "b", 0),
+    (Sequence(Array.from_iter(Iter.items([
+      AnchorStart,
+      Literal(Array.from_iter(Iter.items("hello"))),
+      AnchorEnd,
+    ]))), "hello", 1),
+    (Sequence(Array.from_iter(Iter.items([
+      AnchorStart,
+     Literal(Array.from_iter(Iter.items("hello"))),
+      AnchorEnd,
+    ]))), "hello world", 0),
+  ])) in
+
+  Array.foldl(cases, 0, \(acc, case) ->
+    let (regex, input, expected) = case in
+    let result = is_match(regex, Array.from_iter(Iter.items(input))) in
+    if result {acc + 1}
+    else {acc}// Add result directly (1 for success, 0 for failure)
+  )
+
+
+proc main(): () =
+  let foo = dup("hello") in
+  let iter_str = do input() in
+  let benchmark_name = do input() in
+  let test_fn = if equal(benchmark_name, "regex_test") {
+   
+    test_regex
+  } else {
+    panic("Unknown benchmark name")
+  } in
+  match (string_to_nat(iter_str), string_to_nat(do input())) {
+    (Some(iters), Some(n)) ->
+      match repeat(iters, \() -> test_fn(n)) {
+        Some(result) -> do writeln(int_to_string(result)),
+        None -> (),
+      },
+    _ ->
+      do writeln("Please enter valid iteration count and size."),
+  }

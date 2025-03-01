@@ -1,0 +1,112 @@
+module Core = file "lib/core/core.mor"
+  expose {
+    module Array expose {str},
+    module Iter,
+    module Rand expose {seed_mt19937_64, mt19937_64_next},
+    module String expose { concat, int_to_string, digit_to_nat, string_to_int, equal},
+    module Io expose { writeln },
+    module Option expose { Option { Some, None } },
+  }
+module Bench = file "lib/bench_common.mor" with { Core }
+  expose { repeat }
+  
+type MerkleTree {
+  Leaf(Array Byte, Array Byte),  // (Original Data, Hash)
+  Node(Array Byte, MerkleTree, MerkleTree), // (Hash, Left Subtree, Right Subtree)
+}
+
+hash(data: Array Byte): Array Byte =
+  match string_to_int(data) {
+    Some(val) ->
+      // Use the integer value from the string for hashing
+      let generator = seed_mt19937_64(val) in
+      let (_, random_val) = mt19937_64_next(generator) in
+      int_to_string(random_val),
+      
+    None ->
+      // If data cannot be converted to an integer, use a fallback hash
+     // If data cannot be converted to an integer, use a fallback hash
+      let fallback_seed = Array.foldl(data, 0, \(acc, byte) ->
+      match digit_to_nat(byte) {
+      Some(digit) -> acc + digit,
+      None -> acc, // Ignore non-digit bytes
+    }
+  ) in
+  let fallback_gen = seed_mt19937_64(fallback_seed) in
+  let (_, fallback_random) = mt19937_64_next(fallback_gen) in
+  int_to_string(fallback_random)
+  }
+
+for(start: Int, stop: Int, init: a, func: ((a, Int) -> a)): a =
+  Iter.range(start, stop) |> Iter.foldl(init, func)
+
+slice(arr: Array a, start: Int, end: Int): Array a =
+  if start >= end || start < 0 || end > len(arr) {
+    []  // Return an empty array if indices are invalid
+  } else {
+    let result = Array.fill_with(end - start, \_ -> Array.get(arr, start)) in
+    for(start, end, result, \(res, i) ->
+      Array.set(res, i - start, Array.get(arr, i))
+    )
+  }
+
+build_tree(data: Array (Array Byte)): Option MerkleTree =
+  if len(data) = 0 {
+    None
+  } else if len(data) = 1 {
+    let leaf_hash = hash(get(data, 0)) in
+    Some(Leaf(get(data, 0), leaf_hash))
+  } else {
+    let mid = len(data) / 2 in
+    let left_data = slice(data, 0, mid) in
+    let right_data = slice(data, mid, len(data)) in
+
+    match (build_tree(left_data), build_tree(right_data)) {
+      (Some(left), Some(right)) ->
+        let combined_hash = hash(concat(get_hash(left), get_hash(right))) in
+        Some(Node(combined_hash, left, right)),
+      _ -> None,
+    }
+  }
+
+get_hash(tree: MerkleTree): Array Byte =
+  match tree {
+    Leaf(_, h) -> h,
+    Node(h, _, _) -> h,
+  }
+
+
+fold(tree: MerkleTree, acc: Int, func: (Array Byte, Int) -> Int): Int =
+  match tree {
+    Leaf(data, _) -> func(data, acc),
+    Node(_, left, right) -> 
+      let acc_left = fold(left, acc, func) in
+      fold(right, acc_left, func)
+  }
+
+test_merkle_tree(n: Int): Int =
+  let data = Array.map(Array.from_iter(Iter.range(0, n)), \i -> int_to_string(i)) in
+  match build_tree(data) {
+    Some(tree) -> fold(tree, 0, \(_, acc) -> acc + 1),
+    None -> 0,
+  }
+
+proc main(): () =
+  let iter_str = do input() in
+  let benchmark_name = do input() in
+  let test_fn = if equal(benchmark_name, "merkletree") {
+    test_merkle_tree
+  } else {
+    \_ -> 0
+  } in
+
+  match (string_to_int(iter_str), string_to_int(do input())) {
+      (Some(iters), Some(size)) ->
+      match repeat(iters, \() -> test_fn(size)) {
+        Some(n) -> do writeln(int_to_string(n)),
+        None -> (),
+      },
+    _ ->
+      do writeln("Please enter valid iteration count and tree size.")
+
+  }

@@ -1,0 +1,141 @@
+module Core = file "lib/core/core.mor"
+  expose {
+    module Io expose { writeln },
+    module String expose { int_to_string, string_to_nat, equal, concat },
+    module Option expose { Option { Some,  None} },
+    module Iter expose { range, foldl },
+    module Array,
+  }
+
+module HashMap = file "lib/hashmap.mor" with { Core } expose { HashMap }
+module Parse = file "lib/parse.mor" with { Core } expose { parse_all, lit, byte_eq, byte }
+module Bench = file "lib/bench_common.mor" with { Core }
+  expose { repeat }
+
+type KeyValueStore {
+  KeyValueStore(HashMap (Array Byte) (Array Byte))
+}
+
+create_store(): KeyValueStore =
+  KeyValueStore(HashMap.string_hashmap)
+
+insert(store: KeyValueStore, key: Array Byte, value: Array Byte): KeyValueStore =
+  match store {
+    KeyValueStore(map) ->
+      KeyValueStore(HashMap.insert(map, key, value))
+  }
+
+get(store: KeyValueStore, key: Array Byte): Option (Array Byte) =
+  match store {
+    KeyValueStore(map) -> HashMap.get(map, key)
+  }
+
+delete(store: KeyValueStore, key: Array Byte): KeyValueStore =
+  match store {
+    KeyValueStore(map) -> KeyValueStore(HashMap.remove(map, key))
+  }
+
+process_request(store: KeyValueStore, request: Array Byte): (KeyValueStore, Array Byte) =
+  match parse_all(request, lit(" ")) {
+    Option.Some(method) -> (
+      match parse_all(request, lit(" ")) {
+        Option.Some(path) -> (
+          match parse_all(request, lit("\n")) {
+            Option.Some(_) -> (
+              let body = Array.slice(request, len(method) + len(path) + 2, len(request)) in
+              if equal(method, "GET") {
+                match get(store, path) {
+                  Option.Some(value) ->
+                    (store, Array.from_iter(Iter.items(concat("200 OK\n\n", value)))),
+                  _ ->
+                    (store, Array.from_iter(Iter.items("404 Not Found\n")))
+                }
+              } else if equal(method, "POST") {
+                let updated_store = insert(store, path, body) in
+                (updated_store, Array.from_iter(Iter.items("200 OK\n")))
+              } else if equal(method, "PUT") {
+                let updated_store = insert(store, path, body) in
+                (updated_store, Array.from_iter(Iter.items("200 OK (Updated)\n"))) 
+              } else if equal(method, "DELETE") {
+                let updated_store = delete(store, path) in
+                (updated_store, Array.from_iter(Iter.items("200 OK (Deleted)\n")))
+              } else {
+                (store, Array.from_iter(Iter.items("405 Method Not Allowed\n")))
+              }
+            ),
+            None ->
+              (store, Array.from_iter(Iter.items("400 Bad Request\n")))
+          }
+        ),
+        None ->
+          (store, Array.from_iter(Iter.items("400 Bad Request\n")))
+      }
+    ),
+    None ->
+      (store, Array.from_iter(Iter.items("400 Bad Request\n")))
+  }
+
+
+test_http_requests():  Array (Array Byte) = (
+  let store = create_store() in
+  let requests = [
+    "POST /key1 HTTP/1.1\nValue1",
+    "GET /key1 HTTP/1.1",
+    "PUT /key1 HTTP/1.1\nUpdatedValue1",
+    "GET /key1 HTTP/1.1",
+    "DELETE /key1 HTTP/1.1",
+    "GET /key1 HTTP/1.1"
+  ] in
+  let initial_acc = (store, []) in
+
+  // Fold over the list of requests, updating (store, responses) each time
+  let (_, responses) = Iter.foldl(
+    Iter.items(requests),
+    initial_acc,
+    \(acc, req) -> (
+      let (storeSoFar, responsesSoFar) = acc in
+      let (updated_store, response) =
+        process_request(storeSoFar, Array.from_iter(Iter.items(req))) in
+      let updated_responses = push(responsesSoFar, response) in 
+      (updated_store, updated_responses)
+    )
+  ) in
+
+  // 'responses' is the final list of server responses
+  responses
+)
+
+
+proc main(): () =
+  // Read two lines from stdin: iteration count and benchmark name.
+  let iter_str = do input() in
+  let benchmark_name = do input() in
+
+  // Choose the test function based on the benchmark name.
+  let test_fn = if equal(benchmark_name, "web_kvstore") {
+    test_http_requests
+  } else {
+    panic("Unknown benchmark name")
+  } in
+
+  // Convert the iteration count.
+  match string_to_nat(iter_str) {
+    Option.Some(iters) ->
+      // Call test_fn() repeatedly and collect the results.
+      match repeat(iters, \() -> test_fn()) {
+        Option.Some(results) ->
+          // Sum the lengths of all responses across all runs.
+          let total = Array.foldl(results, 0, \(acc, responses) ->
+            let sum_for_run = Array.foldl(responses, 0, \(acc2, resp) ->
+              acc2 
+            ) in
+            acc + sum_for_run
+          ) in
+          do writeln("1")
+        ,
+        None -> (),
+      }
+    ,
+    Option.None ->
+      do writeln("Please enter a valid iteration count.")
+  }

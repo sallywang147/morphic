@@ -1,0 +1,59 @@
+// tcp_http.mor
+module Core = file "lib/core/core.mor"
+  expose {
+    module Io expose { input, writeln },
+    module Option expose { Option { Some, None } },
+    module Iter,
+    module Array,
+    module String,
+  }
+
+public type Connection {
+  Connection(
+    Int,         // a "connection id" or handle
+    Array Byte   // the "request" data
+  )
+}
+
+public type TcpListener {
+  TcpListener(Array Connection)
+}
+
+// Pretend to "listen on a port", returning a `TcpListener`
+// that has a list of "Connections" waiting to be handled.
+public listen(port: Int): TcpListener = (
+  // For demonstration, we just create a placeholder with an empty list
+  TcpListener([])
+)
+
+// Pretend to "accept" a new connection. In a real TCP server, you'd block until a new client connects.
+public accept(listener: TcpListener): Option Connection = (
+  match listener {
+    TcpListener(conns) ->
+      if (Array.size(conns) > 0) {
+        let conn = Array.get(conns, 0);
+        // remove the first element from conns
+        let rest = Array.slice(conns, 1, Array.size(conns));
+        // pretend we updated the listener in place
+        Some(conn)
+      } else {
+        None
+      }
+  }
+)
+
+// Pretend to read "HTTP requests" from a Connection’s data
+// In a real system, you'd parse multiple requests from a socket stream.
+public read_http_request(conn: Connection): Array Byte = (
+  match conn {
+    Connection(id, requestData) -> requestData
+  }
+)
+
+// Pretend to write a response to the connection
+public write_http_response(conn: Connection, response: Array Byte): () = (
+  // In a real environment, you'd send these bytes over the network
+  // For demonstration, just print it or store it somewhere
+  let textResp = Core.String.fromArray(response);
+  do Io.writeln(Core.String.concat("Response for conn ", Core.String.int_to_string(conn.id), ": ", textResp));
+)

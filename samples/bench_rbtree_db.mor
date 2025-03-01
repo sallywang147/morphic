@@ -1,0 +1,122 @@
+module Core = file "lib/core/core.mor"
+  expose {
+    module Io expose { writeln },
+    module String expose { equal, concat },
+    module Option expose { Option { Some, None } },
+    module Array
+  }
+
+module Bench = file "lib/bench_common.mor" with { Core }
+  expose { repeat }
+
+type Color {
+  Red,
+  Black,
+}
+
+type Tree {
+  Leaf,
+  Node(Color, Tree, Array Byte, Bool, Tree),
+}
+
+fold(t: Tree, b: a, f: (Array Byte, Bool, a) -> a): a =
+  match t {
+    Leaf -> b,
+    Node(_, l, key, value, r) -> fold(r, f(key, value, fold(l, b, f)), f)
+  }
+
+compare_bytes(a: Array Byte, b: Array Byte): Int =
+  let len_a = len(a) in
+  let len_b = len(b) in
+  let min_len = if len_a < len_b { len_a } else { len_b } in
+
+balance1(k: Array Byte, v: Bool, t: Tree, s: Tree): Tree =
+  match s {
+    Leaf -> Leaf,
+    Node(_, Node(Red, l, kx, vx, r1), ky, vy, r2)
+      -> Node(Red, Node(Black, l, kx, vx, r1), ky, vy, Node(Black, r2, k, v, t)),
+    Node(_, l1, ky, vy, Node(Red, l2, kx, vx, r))
+      -> Node(Red, Node(Black, l1, ky, vy, l2), kx, vx, Node(Black, r, k, v, t)),
+    Node(_, l, ky, vy, r)
+      -> Node(Black, Node(Red, l, ky, vy, r), k, v, t),
+  }
+
+balance2(t: Tree, k: Array Byte, v: Bool, s: Tree): Tree =
+  match s {
+    Leaf -> Leaf,
+    Node(_, Node(Red, l, kx1, vx1, r1), ky, vy, r2)
+      -> Node(Red, Node(Black, t, k, v, l), kx1, vx1, Node(Black, r1, ky, vy, r2)),
+    Node(_, l1, ky, vy, Node(Red, l2, kx2, vx2, r2))
+      -> Node(Red, Node(Black, t, k, v, l1), ky, vy, Node(Black, l2, kx2, vx2, r2)),
+    Node(_, l, ky, vy, r)
+      -> Node(Black, t, k, v, Node(Red, l, ky, vy, r)),
+  }
+
+is_red(t: Tree): Bool =
+  match t {
+    Node(Red, _, _, _, _) -> True,
+    _ -> False,
+  }
+
+ins(t: Tree, key: Array Byte, value: Bool): Tree =
+  match t {
+    Leaf
+      -> Node(Red, Leaf, key, value, Leaf),
+    Node(Red, a, ky, vy, b)
+      -> if compare_bytes(key, ky) < 0 { Node(Red, ins(a, key, value), ky, vy, b) }
+         else if compare_bytes(key, ky) = 0 { Node(Red, a, key, value, b) }
+         else { Node(Red, a, ky, vy, ins(b, key, value)) },
+    Node(Black, a, ky, vy, b)
+      -> if compare_bytes(key, ky) < 0 {
+           if is_red(a) { balance1(ky, vy, b, ins(a, key, value)) }
+           else { Node(Black, ins(a, key, value), ky, vy, b) }
+         }
+         else if compare_bytes(key, ky) = 0 { Node(Black, a, key, value, b) }
+         else if is_red(b) { balance2(a, ky, vy, ins(b, key, value)) }
+         else { Node(Black, a, ky, vy, ins(b, key, value)) },
+  }
+
+set_black(t: Tree): Tree =
+  match t {
+    Node(_, l, k, v, r) -> Node(Black, l, k, v, r),
+    _ -> t,
+  }
+
+insert(t: Tree, key: Array Byte, value: Bool): Tree =
+  if is_red(t) {
+    set_black(ins(t, key, value))
+  } else {
+    ins(t, key, value)
+  }
+  //if we write dup: the program will have localID/globalID 
+  //x = dup y: making x owned 
+  //similar to clone 
+  //can we improve performance by manually inserting dups in the user program 
+  //the way you make borrow is you want to make other things owned/duped 
+  //we want to expose the constraints system to the user: we want to make things
+  //borrowed from duped 
+
+find(t: Tree, key: Array Byte): Option Bool =
+  match t {
+    Leaf -> None,
+    Node(_, l, ky, value, r)
+      -> if compare_bytes(key, ky) < 0 { find(l, key) }
+         else if compare_bytes(key, ky) = 0 { Some(value) }
+         else { find(r, key) },
+  }
+
+test_rbtree(): Bool =
+  let url = Array.from_iter("https://ondemand-01.farmshare.stanford.edu/pun/sys/shell/ssh/default") in
+  let t = insert(Leaf, url, True) in
+  match find(t, url) {
+    Some(value) -> value,
+    None -> False,
+  }
+
+proc main(): () =
+  let result = test_rbtree() in
+  if result {
+    do writeln("Found")
+  } else {
+    do writeln("Not Found")
+  }

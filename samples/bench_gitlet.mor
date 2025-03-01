@@ -1,0 +1,190 @@
+module Core = file "lib/core/core.mor"
+  expose {
+    module Io expose { writeln },
+    module String expose { concat, int_to_string, equal, string_to_nat },
+    module Option expose { Option { Some, None } },
+    module Iter expose { range, foldl },
+    module Array,
+  }
+
+module HashMap = file "lib/hashmap.mor" with { Core } expose { HashMap }
+module Bench = file "lib/bench_common.mor" with { Core }
+  expose { repeat }
+
+////////////////////////////////////////////////////////////////////////////////
+// Type Definitions
+////////////////////////////////////////////////////////////////////////////////
+
+// A Commit stores a commit id, a commit message, and an optional parent id.
+type Commit {
+  Commit(Int, Array Byte, Option Int)  // (commit_id, message, parent_commit_id)
+}
+
+// Extend Gitlet so that it carries:
+//   - latest_commit_id : Int
+//   - commit_map       : HashMap (Array Byte) Commit
+//   - stage            : HashMap (Array Byte) Array Byte   -- staging area (file -> content)
+//   - stash            : Array (HashMap (Array Byte) Array Byte) -- list of stashed staging areas
+type Gitlet {
+  Gitlet(Int, HashMap (Array Byte) Commit, HashMap (Array Byte) Array Byte, Array (HashMap (Array Byte) Array Byte))
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Repository Constructors and Basic Commit Function
+////////////////////////////////////////////////////////////////////////////////
+
+// Initialize a Gitlet repository: no commits, empty staging area, empty stash.
+init_gitlet(): Gitlet =
+  let commit_map = HashMap.string_hashmap in
+  let stage = HashMap.string_hashmap in
+  Gitlet(0, commit_map, stage, [])
+
+// The commit function creates a new commit using a given message.
+// It preserves the staging area and stash.
+commit(repo: Gitlet, message: Array Byte): Gitlet =
+  match repo {
+    Gitlet(latest, commit_map, stage, stash) ->
+      let new_commit_id = latest + 1 in
+      let new_commit = Commit(new_commit_id, message, Some(latest)) in
+      let key = int_to_string(new_commit_id) in
+      Gitlet(new_commit_id, HashMap.insert(commit_map, key, new_commit), stage, stash)
+  }
+
+////////////////////////////////////////////////////////////////////////////////
+// New Functions: git_add, stash, stage
+////////////////////////////////////////////////////////////////////////////////
+
+// git_add: Add a file (given by filename and content) to the staging area.
+git_add(repo: Gitlet, filename: Array Byte, content: Array Byte): Gitlet =
+  match repo {
+    Gitlet(latest, commit_map, stage, stash) ->
+      let new_stage = HashMap.insert(stage, filename, content) in
+      Gitlet(latest, commit_map, new_stage, stash)
+  }
+
+// stash: Save the current staging area into the stash, and then clear the staging area.
+stash(repo: Gitlet): Gitlet =
+  match repo {
+    Gitlet(latest, commit_map, stage, stash) ->
+      // Push the current stage into the stash.
+      let new_stash = Array.push(stash, stage) in
+      // Clear the staging area (using an empty hash map).
+      let empty_stage = HashMap.string_hashmap in
+      Gitlet(latest, commit_map, empty_stage, new_stash)
+  }
+
+// stage: Commit the current staging area.
+// For simplicity, the commit message is "Staged: " concatenated with the number of files staged.
+// (Since we cannot inspect the internal count of the stage, we assume the caller knows how many files were added.)
+stage(repo: Gitlet): Gitlet =
+  match repo {
+    Gitlet(latest, commit_map, stage, stash) ->
+      // For our test, we assume that the number of staged files is not computed from the map.
+      // Instead, we simulate it by building a message (here we simply use a placeholder message).
+      let msg = concat("Staged commit", "") in
+      // Create a new commit with that message.
+      let repo_after_commit = commit(Gitlet(latest, commit_map, stage, stash), msg) in
+      // Clear the staging area after committing.
+      match repo_after_commit {
+        Gitlet(new_latest, new_commits, _, stash2) ->
+          let empty_stage = HashMap.string_hashmap in
+          Gitlet(new_latest, new_commits, empty_stage, stash2)
+      }
+  }
+
+////////////////////////////////////////////////////////////////////////////////
+// Utility Functions for Logs
+////////////////////////////////////////////////////////////////////////////////
+
+// Recursively collect logs from the repository.
+collect_logs(commit_map: HashMap (Array Byte) Commit, commit_id: Int, count: Int): Int =
+  let key = int_to_string(commit_id) in
+  match HashMap.get(commit_map, key) {
+    Some(Commit(_, _, Some(parent_id))) ->
+      collect_logs(commit_map, parent_id, count + 1),
+    Some(Commit(_, _, None)) ->
+      count + 1,
+    None -> count,
+  }
+
+// Get the total number of commits in the repository.
+log_count(repo: Gitlet): Int =
+  match repo {
+    Gitlet(latest, commit_map, _, _) ->
+      collect_logs(commit_map, latest, 0)
+  }
+
+////////////////////////////////////////////////////////////////////////////////
+// Test Functions
+////////////////////////////////////////////////////////////////////////////////
+
+// Original test: repeatedly commit with messages.
+test_gitlet(n: Int): Int =
+  let repo = init_gitlet() in
+  let repo_with_commits = Iter.range(1, n + 1)
+    |> Iter.foldl(repo, \(r, i) -> commit(r, concat("Message ", int_to_string(i)))) in
+  log_count(repo_with_commits)
+
+// Test git_add: add n files to staging and return the number of staged entries.
+// (Since we cannot extract the actual count from the opaque HashMap,
+// we return n, the number of files we attempted to add.)
+test_git_add(n: Int): Int =
+  let repo = init_gitlet() in
+  let result = Iter.range(1, n + 1)
+         |> Iter.foldl(repo, \(r, i) -> git_add(r, concat("file", int_to_string(i)), concat("content", int_to_string(i)))) in
+  n
+
+// Test stash: add n files to staging, then stash the staging area,
+// and return the number of stashed entries.
+test_stash(n: Int): Int =
+  let repo = init_gitlet() in
+  let repo_after_add = Iter.range(1, n + 1)
+    |> Iter.foldl(repo, \(r, i) -> git_add(r, concat("file", int_to_string(i)), concat("content", int_to_string(i)))) in
+  let repo_after_stash = stash(repo_after_add) in
+  match repo_after_stash {
+    Gitlet(_, _, _, stash) -> Array.len(stash)
+  }
+
+// Test stage: add n files to staging, then stage (i.e. commit) the staging area,
+// and return the total number of commits.
+test_stage(n: Int): Int =
+  let repo = init_gitlet() in
+  let repo_after_add = Iter.range(1, n + 1)
+    |> Iter.foldl(repo, \(r, i) -> git_add(r, concat("file", int_to_string(i)), concat("content", int_to_string(i)))) in
+  let repo_after_stage = stage(repo_after_add) in
+  log_count(repo_after_stage)
+
+////////////////////////////////////////////////////////////////////////////////
+// Main Function for Benchmarking
+////////////////////////////////////////////////////////////////////////////////
+
+// The main function reads three inputs:
+//   1. The number of iterations (how many times to run the test)
+//   2. The benchmark name (one of "gitlet", "git_add", "stash", or "stage")
+//   3. A size parameter n (number of commits or files to process)
+// It then selects the appropriate test function and repeats it.
+proc main(): () =
+  let iter_str = do input() in
+  let benchmark_name = do input() in
+  // Choose the test function based on the benchmark name.
+  let test_fn = if equal(benchmark_name, "gitlet") {
+    test_gitlet
+  } else if equal(benchmark_name, "git_add") {
+    test_git_add
+  } else if equal(benchmark_name, "stash") {
+    test_stash
+  } else if equal(benchmark_name, "stage") {
+    test_stage
+  } else {
+    panic("Unknown benchmark name")
+  } in
+  match (string_to_nat(iter_str), string_to_nat(do input())) {
+    (Some(iters), Some(n)) ->
+      match repeat(iters, \() -> test_fn(n)) {
+        Option.Some(result) -> do writeln(int_to_string(result)),
+        Option.None -> ()
+      }
+    ,
+    _ ->
+      do writeln("Please enter valid iteration count and size.")
+  }

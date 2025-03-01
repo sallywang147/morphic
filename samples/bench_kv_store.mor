@@ -1,0 +1,88 @@
+module Core = file "lib/core/core.mor"
+  expose {
+    module Io expose { writeln },
+    module String expose { int_to_string, string_to_nat, equal, concat },
+    module Option expose { Option { Some, None } },
+    module Iter expose { range, foldl },
+  }
+
+module HashMap = file "lib/hashmap.mor" with { Core } expose { HashMap }
+module Bench = file "lib/bench_common.mor" with { Core }
+  expose { repeat }
+
+type KeyValueStore {
+  KeyValueStore(HashMap (Array Byte) Int)
+}
+
+create_store(): KeyValueStore =
+  KeyValueStore(HashMap.string_hashmap)
+
+insert(store: KeyValueStore, key: Array Byte, value: Int): KeyValueStore =
+  match store {
+    KeyValueStore(map) ->
+      KeyValueStore(HashMap.insert(map, key, value))
+  }
+
+get(store: KeyValueStore, key: Array Byte): Option Int =
+  match store {
+    KeyValueStore(map) -> HashMap.get(map, key)
+  }
+
+remove(store: KeyValueStore, key: Array Byte): KeyValueStore =
+  match store {
+    KeyValueStore(map) ->
+      KeyValueStore(HashMap.remove(map, key))
+  }
+
+is_empty(store: KeyValueStore): Bool =
+  match store {
+    KeyValueStore(map) -> HashMap.is_empty(map)
+  }
+
+// Helper to simulate a "for" loop using Iter.range and Iter.foldl
+loop(start: Int, stop: Int, init: a, func: ((a, Int) -> a)): a =
+  Iter.range(start, stop) |> Iter.foldl(init, func)
+
+test_kv_store(n: Int): Int =
+  // Create an empty store
+  let store = create_store() in
+
+  // Insert n keys and values
+  let store_filled = loop(0, n, store, \(s, i) -> 
+    insert(s, concat("key", int_to_string(i)), i)
+  ) in
+
+  // Retrieve and sum all values
+  let sum = loop(0, n, 0, \(acc, i) ->
+    match get(store_filled, concat("key", int_to_string(i))) {
+      Some(value) -> acc + value,
+      None -> acc,
+    }
+  ) in
+
+  // Remove all keys
+  let store_empty = loop(0, n, store_filled, \(s, i) -> 
+    remove(s, concat("key", int_to_string(i)))
+  ) in
+
+  // Check if the store is empty
+  let empty = is_empty(store_empty) in
+  if empty { sum } else { -1 }
+
+proc main(): () =
+  let iter_str = do input() in
+  let benchmark_name = do input() in
+  let test_fn = if equal(benchmark_name, "kv_store") {
+    test_kv_store
+  } else {
+    panic("Unknown benchmark name")
+  } in
+  match (string_to_nat(iter_str), string_to_nat(do input())) {
+    (Some(iters), Some(n)) ->
+      match repeat(iters, \() -> test_fn(n)) {
+        Some(result) -> do writeln(int_to_string(result)),
+        None -> (),
+      },
+    _ ->
+      do writeln("Please enter valid iteration count and size."),
+  }

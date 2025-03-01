@@ -9,7 +9,7 @@ map_from(arr: Array a, f: a -> a, idx: Int): Array a =
   if idx = len(arr) {
     arr
   } else {
-    let (x, hole) = extract(arr, idx) in
+    let (x, hole) = extract(arr, idx) in //hole array; keep rc as 1 
     map_from(hole(f(x)), f, idx + 1)
   }
 

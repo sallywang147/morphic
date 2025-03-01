@@ -1,0 +1,9 @@
+module Core = file "lib/core/core.mor"
+
+module Test = file "lib/test.mor"
+  with { Core }
+  expose { test }
+
+proc main(): () =
+  dup()
+  //do output("Completed all tests\n")

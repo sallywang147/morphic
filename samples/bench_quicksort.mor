@@ -7,8 +7,6 @@ module Core = file "lib/core/core.mor"
     module Iter,
   }
 
-module Bench = file "lib/bench_common.mor" with { Core }
-  expose { repeat }
 
 swap(arr: Array Int, i: Int, j: Int): Array Int =
   let temp = Array.get(arr, i) in
