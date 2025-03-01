@@ -218,6 +218,8 @@ fn write_expr(w: &mut dyn Write, expr: &Expr, context: Context) -> io::Result<()
 
         Expr::Panic(_ret_type, _input_type, local_id) => write_single(w, "panic", local_id),
 
+        Expr::Dup(_ret_type, _input_type, local_id) => write_single(w, "dup", local_id),
+
         Expr::ArrayLit(_, elem_ids) => {
             let elems_are_contiguous = elem_ids.len() > 1
                 && (0..elem_ids.len() - 1).all(|i| elem_ids[i].0 + 1 == elem_ids[i + 1].0);

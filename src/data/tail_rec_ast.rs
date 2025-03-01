@@ -55,7 +55,11 @@ pub enum Expr {
         ModeScheme, // Input type
         rc::LocalId,
     ),
-
+    Dup(
+        rc::Type,   // Output type
+        ModeScheme, // Input type
+        rc::LocalId,
+    ),
     ArrayLit(
         ModeScheme,       // Scheme of *item*
         Vec<rc::LocalId>, // Elements

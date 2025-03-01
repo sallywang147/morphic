@@ -1176,7 +1176,10 @@ pub enum Expr<R, I, J> {
         Type<R, I>, // Return type
         Occur<R, I>,
     ),
-
+    Dup(
+        Type<R, I>, // Return type
+        Occur<R, I>,
+    ),
     ArrayLit(Type<R, I>, Vec<Occur<R, I>>),
     BoolLit(bool),
     ByteLit(u8),

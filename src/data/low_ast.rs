@@ -123,6 +123,12 @@ pub enum Expr {
         LocalId,    // Message
     ),
 
+    Dup(
+        Type,       // Output type
+        ModeScheme, // Input type
+        LocalId,    // Message
+    ),
+
     BoolLit(bool),
     ByteLit(u8),
     IntLit(i64),
@@ -161,4 +167,5 @@ pub struct Program {
     pub schemes: IdVec<ModeSchemeId, ModeScheme>,
     pub profile_points: IdVec<prof::ProfilePointId, prof::ProfilePoint>,
     pub main: CustomFuncId,
+    pub total_num_rcop: i64,
 }

@@ -391,7 +391,7 @@ fn lower_expr(
 ) -> rc::LocalId {
     let new_expr = match expr {
         // The only interesting case...
-        annot::Expr::RcOp(op, sel, arg_id) => {
+        annot::Expr::RcOp(op, sel, arg_id, _) => {
             let arg = ctx.local_binding(*arg_id);
             let plan = RcOpPlan::from_selector(customs, &arg.old_ty, sel);
             // println!(
@@ -621,6 +621,15 @@ fn lower_expr(
             );
             rc::Expr::Panic(lower_type(&ret_ty.shape()), input_scheme, new_id(ctx, &msg))
         }
+
+        annot::Expr::Dup(ret_ty, msg) => {
+            let input_scheme = make_scheme(
+                insts,
+                &msg.ty.shape(),
+                &prepare_value_res(msg.ty.res().as_slice()),
+            );
+            rc::Expr::Dup(lower_type(&ret_ty.shape()), input_scheme, new_id(ctx, &msg))
+        }
         annot::Expr::ArrayLit(item_ty, items) => {
             let scheme = make_scheme(
                 insts,
@@ -725,5 +734,6 @@ pub fn rc_specialize(program: annot::Program, progress: impl ProgressLogger) -> 
         schemes,
         profile_points: program.profile_points,
         main: program.main,
+        //total_num_rcop: program.total_num_rcop,
     }
 }

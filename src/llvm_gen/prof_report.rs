@@ -1,7 +1,7 @@
 use crate::data::low_ast as low;
 use crate::data::profile as prof;
 use crate::data::tail_rec_ast as tail;
-use crate::llvm_gen::fountain_pen::{scope, Scope};
+use crate::llvm_gen::fountain_pen::{increment_retain_counter, scope, Scope};
 use crate::llvm_gen::tal::Tal;
 use crate::util::iter::try_zip_eq;
 use id_collections::IdVec;
@@ -149,7 +149,9 @@ impl<'a> Json<'a> {
 
             Json::DynU64(val) => {
                 s.call_void(tal.prof_report_write_u64, &[*val]);
-            }
+            } //Json::DynU64(val) => {
+              //    s.call_void(tal.prof_rc_init, &[*val]);
+              //}
         }
     }
 
@@ -157,7 +159,205 @@ impl<'a> Json<'a> {
         self.gen_serialize_rec(tal, s, FormatContext::Indent(0));
     }
 }
+/***
+pub fn profile_init_fn<'a>(
+    context: &'a Context,
+    target: &TargetData,
+    module: &Module<'a>,
+    tal: &Tal<'a>,
+    profile_points: &IdVec<prof::ProfilePointId, prof::ProfilePoint>,
+    profile_point_decls: &IdVec<prof::ProfilePointId, ProfilePointDecls<'a>>,
+) -> FunctionValue<'a> {
+    let result = module.add_function(
+        "prof_report",
+        context.void_type().fn_type(&[], false),
+        Some(Linkage::Internal),
+    );
 
+
+    // load-bearing '&' due to closure shenanigans
+    let s = &scope(result, context, target);
+    let counter = s.i64(increment_retain_counter() as u64);
+    //counter needs to be defined
+    s.call_void(tal.prof_rc_init, &[counter]);
+    let to_write = {
+        use Format::*;
+        use Json::*;
+
+        Object(
+            MultiLine,
+            vec![
+                // ("prof_init", DynU64(s.call(tal.prof_rc_init, &[counter]))),
+                (
+                    "timings",
+                    Array(
+                        MultiLine,
+                        try_zip_eq(profile_points, profile_point_decls)
+                            .unwrap()
+                            .flat_map(|(_prof_id, prof_point, prof_decls)| {
+                                prof_point
+                                    .reporting_names
+                                    .iter()
+                                    .map(move |(module, function)| {
+                                        Object(
+                                            MultiLine,
+                                            vec![
+                                                (
+                                                    "module",
+                                                    Array(
+                                                        SingleLine,
+                                                        module
+                                                            .0
+                                                            .iter()
+                                                            .map(|elem| {
+                                                                ConstString(elem.0.to_owned())
+                                                            })
+                                                            .collect(),
+                                                    ),
+                                                ),
+                                                ("function", ConstString(function.0.to_owned())),
+                                                (
+                                                    "specializations",
+                                                    Array(
+                                                        MultiLine,
+                                                        prof_decls
+                                                            .counters
+                                                            .iter()
+                                                            .map(|(low_id, counters)| {
+                                                                let mut entries = vec![
+                                                                    (
+                                                                        "low_func_id",
+                                                                        ConstU64(low_id.0 as u64),
+                                                                    ),
+                                                                    (
+                                                                        "total_calls",
+                                                                        DynU64(s.ptr_get(
+                                                                            s.i64_t(),
+                                                                            counters
+                                                                                .total_calls
+                                                                                .as_pointer_value()
+                                                                                .into(),
+                                                                        )),
+                                                                    ),
+                                                                    (
+                                                                        "total_clock_nanos",
+                                                                        DynU64(s.ptr_get(
+                                                                            s.i64_t(),
+                                                                            counters
+                                                                                .total_clock_nanos
+                                                                                .as_pointer_value()
+                                                                                .into(),
+                                                                        )),
+                                                                    ),
+                                                                ];
+
+                                                                if let Some(total_retain_count) =
+                                                                    counters.total_retain_count
+                                                                {
+                                                                    entries.push((
+                                                                        "total_retain_count",
+                                                                        DynU64(s.ptr_get(
+                                                                            s.i64_t(),
+                                                                            total_retain_count
+                                                                                .as_pointer_value()
+                                                                                .into(),
+                                                                        )),
+                                                                    ));
+                                                                }
+
+                                                                if let Some(total_release_count) =
+                                                                    counters.total_release_count
+                                                                {
+                                                                    entries.push((
+                                                                        "total_release_count",
+                                                                        DynU64(s.ptr_get(
+                                                                            s.i64_t(),
+                                                                            total_release_count
+                                                                                .as_pointer_value()
+                                                                                .into(),
+                                                                        )),
+                                                                    ));
+
+                                                                    if let Some(total_rc1_count) =
+                                                                        counters.total_rc1_count
+                                                                    {
+                                                                        entries.push((
+                                                                        "total_rc1_count",
+                                                                        DynU64(s.ptr_get(
+                                                                            s.i64_t(),
+                                                                            total_rc1_count
+                                                                                .as_pointer_value()
+                                                                                .into(),
+                                                                        )),
+                                                                    ));
+                                                                    }
+                                                                }
+
+                                                                Object(SingleLine, entries)
+                                                            })
+                                                            .collect(),
+                                                    ),
+                                                ),
+                                                // We include these because we don't want skipped
+                                                // tail-recursive functions to be silently lost, but
+                                                // we also don't want to generate a warning or error
+                                                // during compilation purely due to profiling
+                                                // concerns.
+                                                //
+                                                // Most likely, anything consuming a profile report
+                                                // should throw an error if this array is nonempty
+                                                // for a function it cares about.
+                                                (
+                                                    "skipped_tail_rec_specializations",
+                                                    Array(
+                                                        MultiLine,
+                                                        prof_decls
+                                                            .skipped_tail_rec
+                                                            .iter()
+                                                            .map(|(low_id, tail_id)| {
+                                                                Object(
+                                                                    SingleLine,
+                                                                    vec![
+                                                                        (
+                                                                            "low_func_id",
+                                                                            ConstU64(
+                                                                                low_id.0 as u64,
+                                                                            ),
+                                                                        ),
+                                                                        (
+                                                                            "tail_func_id",
+                                                                            ConstU64(
+                                                                                tail_id.0 as u64,
+                                                                            ),
+                                                                        ),
+                                                                    ],
+                                                                )
+                                                            })
+                                                            .collect(),
+                                                    ),
+                                                ),
+                                            ],
+                                        )
+                                    })
+                            })
+                            .collect(),
+                    ),
+                ),
+            ],
+        )
+    };
+
+    to_write.gen_serialize(tal, &s);
+
+    s.call_void(tal.prof_report_done, &[]);
+
+    s.ret_void();
+
+    result
+}
+***/
+
+//define a function prof report: this is generating a prof_report function
 pub fn define_prof_report_fn<'a>(
     context: &'a Context,
     target: &TargetData,
@@ -172,10 +372,14 @@ pub fn define_prof_report_fn<'a>(
         Some(Linkage::Internal),
     );
 
-    // load-bearing '&' due to closure shenanigans
     let s = &scope(result, context, target);
-
+    //let s = &scope(result, context, target);
     s.call_void(tal.prof_report_init, &[]);
+    let counter = s.i64(increment_retain_counter() as u64);
+    //counter needs to be defined
+    s.call_void(tal.prof_rc_init, &[counter]);
+
+    // load-bearing '&' due to closure shenanigans
 
     let to_write = {
         use Format::*;
@@ -184,6 +388,7 @@ pub fn define_prof_report_fn<'a>(
         Object(
             MultiLine,
             vec![
+                // ("prof_rc_init", s.call_void(tal.prof_rc_init, &[counter])),
                 (
                     "clock_res_nanos",
                     DynU64(s.call(tal.prof_clock_res_nanos, &[])),

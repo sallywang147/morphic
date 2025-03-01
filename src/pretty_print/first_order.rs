@@ -405,6 +405,7 @@ impl<'a, 'b> Context<'a, 'b> {
             Expr::ByteLit(_) => Precedence::Var,
             Expr::IntLit(_) => Precedence::Var,
             Expr::FloatLit(_) => Precedence::Var,
+            Expr::Dup(_, _) => Precedence::App,
         };
 
         if precedence > my_precedence {
@@ -552,6 +553,18 @@ impl<'a, 'b> Context<'a, 'b> {
                 }
                 Variant::OCAML | Variant::SML => {
                     self.write("panic ")?;
+                    self.write_expr(a, Precedence::Var)?;
+                }
+            },
+
+            Expr::Dup(_type, a) => match self.variant {
+                Variant::MORPHIC => {
+                    self.write("dup (")?;
+                    self.write_expr(a, Precedence::Top)?;
+                    self.write(")")?;
+                }
+                Variant::OCAML | Variant::SML => {
+                    self.write("dup ")?;
                     self.write_expr(a, Precedence::Var)?;
                 }
             },
@@ -1397,6 +1410,7 @@ fn add_func_deps(deps: &mut BTreeSet<CustomFuncId>, expr: &Expr) {
             IoOp::Output(a) => add_func_deps(deps, a),
         },
         Expr::Panic(_, a) => add_func_deps(deps, a),
+        Expr::Dup(_, a) => add_func_deps(deps, a),
         Expr::Ctor(_, _, a) => match a {
             Some(b) => add_func_deps(deps, b),
             None => {}

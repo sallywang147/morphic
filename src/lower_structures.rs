@@ -5,10 +5,12 @@ use crate::data::mode_annot_ast::Mode;
 use crate::data::obligation_annot_ast::CustomTypeId;
 use crate::data::rc_specialized_ast::{self as rc, ModeScheme};
 use crate::data::tail_rec_ast as tail;
+use crate::globals::GLOBAL_INDEX;
 use crate::util::local_context::LocalContext;
 use crate::util::progress_logger::ProgressLogger;
 use crate::util::progress_logger::ProgressSession;
 use id_collections::IdVec;
+use std::sync::atomic::Ordering;
 
 // In this pass we:
 // - Convert array literals into a series of pushes
@@ -209,6 +211,12 @@ fn lower_expr(
             input_type.clone(),
             message.lookup_in(context),
         ),
+
+        tail::Expr::Dup(ret_type, input_type, message) => low::Expr::Dup(
+            ret_type.clone(),
+            input_type.clone(),
+            message.lookup_in(context),
+        ),
         tail::Expr::ArrayLit(item_scheme, elems) => {
             // TODO: we are inlining some knowledge here about the signatures of `Array.new`,
             // `Array.reserve`, and `Array.push`. Types should be determined instead by the same
@@ -324,5 +332,6 @@ pub fn lower_structures(program: tail::Program, progress: impl ProgressLogger) -
         schemes: program.schemes,
         profile_points: program.profile_points,
         main: low::CustomFuncId(program.main.0),
+        total_num_rcop: GLOBAL_INDEX.load(Ordering::SeqCst),
     }
 }

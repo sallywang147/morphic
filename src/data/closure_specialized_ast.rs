@@ -78,6 +78,7 @@ pub enum Expr {
     ByteLit(u8),
     IntLit(i64),
     FloatLit(f64),
+    Dup(Type, FuncRep),
 }
 
 #[id_type]

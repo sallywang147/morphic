@@ -415,6 +415,10 @@ impl<'a> Context<'a> {
                 special::Expr::Ctor(resolved_custom, *variant, resolved_rep)
             }
 
+            annot::Expr::Dup(ret_type, solution) => special::Expr::Dup(
+                self.resolve_type(ret_type, params),
+                self.resolve_solution(solution, params),
+            ),
             annot::Expr::Global(val_id, val_params) => {
                 let resolved_val_params =
                     val_params.map_refs(|_, solution| self.resolve_solution(&solution, params));

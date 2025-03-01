@@ -131,6 +131,11 @@ impl<'a> Context<'a> {
             Expr::Panic(type_, expr) => {
                 Expr::Panic(self.remove_type(type_), Box::new(self.remove_expr(*expr)))
             }
+
+            Expr::Dup(type_, expr) => {
+                Expr::Dup(self.remove_type(type_), Box::new(self.remove_expr(*expr)))
+            }
+
             Expr::Ctor(type_id, variant_id, arg) => match self.type_reduction.get(&type_id) {
                 Some(_t) => {
                     arg.map_or_else(|| Expr::Tuple(Vec::new()), |arg| self.remove_expr(*arg))
@@ -354,6 +359,7 @@ fn typecheck_expr(ctx: &mut Context, expr: &Expr) -> Type {
         E::IoOp(IoOp::Input) => T::Array(Box::new(T::Num(NumType::Byte))),
         E::IoOp(IoOp::Output(_output)) => T::Tuple(vec![]),
         E::Panic(ret_type, _message) => ret_type.clone(),
+        E::Dup(ret_type, _message) => ret_type.clone(),
         E::Ctor(type_id, _variant_id, _expr) => T::Custom(*type_id),
         E::Local(local_id) => ctx.locals[local_id.0].clone(),
         E::Tuple(items) => {

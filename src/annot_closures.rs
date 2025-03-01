@@ -242,6 +242,7 @@ enum SolverExpr {
         res::VariantId,
         SolverVarId,
     ),
+    Dup(annot::Type<SolverVarId>, SolverVarId),
     Global(mono::CustomGlobalId, IdVec<annot::RepParamId, SolverVarId>),
     PendingGlobal(mono::CustomGlobalId), // A global belonging to the current SCC
     Local(lifted::LocalId),
@@ -1707,6 +1708,11 @@ fn extract_expr(
             *custom,
             vars.map_refs(|_, var| class_solutions[equiv_classes.class(*var)].clone()),
             *variant,
+            class_solutions[equiv_classes.class(*var)].clone(),
+        ),
+
+        SolverExpr::Dup(ret_type, var) => annot::Expr::Dup(
+            extract_type(equiv_classes, class_solutions, ret_type),
             class_solutions[equiv_classes.class(*var)].clone(),
         ),
 

@@ -20,7 +20,10 @@ use crate::llvm_gen::cow_array::{
     cow_array_type, cow_hole_array_type, CowArrayImpl, CowArrayIoImpl,
 };
 use crate::llvm_gen::prof_report::{
-    define_prof_report_fn, ProfilePointCounters, ProfilePointDecls,
+    define_prof_report_fn,
+    ProfilePointCounters,
+    ProfilePointDecls,
+    //profile_init_fn,
 };
 use crate::llvm_gen::rc::{rc_ptr_type, RcBoxBuiltin};
 use crate::llvm_gen::tal::{ProfileRc, Tal};
@@ -43,8 +46,8 @@ use inkwell::targets::{
 };
 use inkwell::types::{BasicType, BasicTypeEnum, IntType, StructType};
 use inkwell::values::{
-    BasicValue, BasicValueEnum, CallSiteValue, FloatValue, FunctionValue, GlobalValue, IntValue,
-    PointerValue, StructValue,
+    BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallSiteValue, FloatValue, FunctionValue,
+    GlobalValue, IntValue, PointerValue, StructValue,
 };
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
@@ -434,8 +437,9 @@ struct Globals<'a, 'b> {
 
 #[derive(Clone, Debug)]
 struct CustomTypeDecls<'a> {
+    //refers to user defined data type
     type_: BasicTypeEnum<'a>,
-    retain: FunctionValue<'a>,
+    retain: FunctionValue<'a>, //handle to llvm function
     derived_retain: FunctionValue<'a>,
     release: FunctionValue<'a>,
 }
@@ -1654,6 +1658,30 @@ fn gen_expr<'a, 'b>(
             builder.position_at_end(unreachable_block);
             get_undef(&get_llvm_type(globals, ret_type))
         }
+
+        E::Dup(ret_type, _input_type, message_id) => {
+            let builtin_io = &instances.cow_array_io;
+            builder
+                .build_call(
+                    builtin_io.output_error,
+                    &[locals[message_id].into()],
+                    "cow_array_dup",
+                )
+                .unwrap();
+
+            builder
+                .build_call(
+                    globals.tal.exit,
+                    &[globals.context.i32_type().const_int(1 as u64, false).into()],
+                    "exit_call",
+                )
+                .unwrap();
+
+            builder.build_unreachable().unwrap();
+            let unreachable_block = context.append_basic_block(func, "after_dup");
+            builder.position_at_end(unreachable_block);
+            get_undef(&get_llvm_type(globals, ret_type))
+        }
         E::BoolLit(val) => {
             BasicValueEnum::from(context.bool_type().const_int(*val as u64, false)).into()
         }
@@ -1669,15 +1697,19 @@ fn gen_expr<'a, 'b>(
     }
 }
 
+
 fn gen_function<'a, 'b>(
-    context: &'a Context,
+    //index 
+    context: &'a Context, //we can also put index here 
     instances: &mut Instances<'a>,
     globals: &Globals<'a, 'b>,
     func_decl: FunctionValue<'a>,
     funcs: &IdVec<low::CustomFuncId, FunctionValue<'a>>,
     func_id: low::CustomFuncId,
-    func: &low::FuncDef,
+    func: &low::FuncDef, //user function 
 ) {
+    //increment index ehre: index++; 
+    //cancel prior index increment; 
     let builder = context.create_builder();
     let entry = context.append_basic_block(func_decl, "entry");
     builder.position_at_end(entry);
@@ -1878,8 +1910,10 @@ fn gen_function<'a, 'b>(
 
     // Generate main body
     {
+        //increment the counter here 
         let mut locals = IdVec::from_vec(vec![func_decl.get_nth_param(0).unwrap()]);
         let ret_value = gen_expr(
+            //index;
             &builder,
             instances,
             globals,
@@ -2058,6 +2092,7 @@ fn declare_customs<'a, 'b>(
 
 fn gen_program<'a>(
     program: low::Program,
+
     target_machine: &TargetMachine,
     context: &'a Context,
     func_progress: impl ProgressLogger,
@@ -2080,7 +2115,6 @@ fn gen_program<'a>(
         &target_machine.get_target_data(),
         profile_record_rc,
     );
-
     let profile_points = declare_profile_points(&context, &module, &program);
 
     let type_dep_order = custom_type_dep_order(&program.custom_types.types);
@@ -2100,6 +2134,8 @@ fn gen_program<'a>(
         profile_points,
     };
 
+    let context = globals.context;
+    //let retain_counter =
     let custom_types = declare_customs(&globals, &module);
 
     let mut instances = Instances::new(&globals);
@@ -2159,6 +2195,33 @@ fn gen_program<'a>(
     let main_block = context.append_basic_block(main, "main_block");
     builder.position_at_end(main_block);
 
+    //initialze the array initializer function
+    //builder
+    //.build_call (refer to external function)
+    //initialze the array initializer function
+    //builder
+    //wrap the build call inside the if: initialize prof_rc
+    //add if program.profile_points.len() > 0 { }before we add build_call
+    //.build_call (refer to external function)
+
+    //generate llvm
+    //generate llvm
+    //
+
+    //let s = scope(main, context, target);
+    let int_type = context.i64_type();
+    if program.profile_points.len() > 0 {
+        let int_value = int_type.const_int(program.total_num_rcop as u64, false);
+        let basic_metadata: BasicMetadataValueEnum = BasicMetadataValueEnum::IntValue(int_value);
+        builder
+            .build_call(
+                tal.prof_rc_init,
+                &[basic_metadata], //LLVM constant cresponding to the number; some inkwell
+                //use inkwell function to get llvm constant
+                "prof_init", //naming hint for the builder
+            )
+            .unwrap();
+    }
     builder
         .build_call(
             funcs[program.main],
@@ -2185,7 +2248,7 @@ fn gen_program<'a>(
     builder
         .build_return(Some(&i32_type.const_int(0, false)))
         .unwrap();
-
+    //}
     return module;
 }
 

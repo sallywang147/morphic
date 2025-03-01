@@ -21,6 +21,9 @@ pub struct ValDef {
 }
 
 #[derive(Clone, Debug)]
+//we do not need to add dup heree, because we've already modified res 
+//make sure path does the correct thing 
+//our dup is a shared data structure 
 pub enum Expr {
     Global(res::GlobalId, IdVec<res::TypeParamId, res::Type>),
     Local(res::LocalId),

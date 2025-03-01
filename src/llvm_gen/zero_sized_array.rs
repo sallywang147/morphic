@@ -1,7 +1,9 @@
 use crate::data::mode_annot_ast::Mode;
 use crate::data::rc_specialized_ast::ModeScheme;
 use crate::llvm_gen::array::ArrayImpl;
-use crate::llvm_gen::fountain_pen::scope;
+//use crate::llvm_gen::counter::increment_retain_counter;
+//use crate::llvm_gen::fountain_pen::scope;
+use crate::llvm_gen::fountain_pen::{increment_retain_counter, scope};
 use crate::llvm_gen::tal::{ProfileRc, Tal};
 use crate::llvm_gen::{get_llvm_type, is_zero_sized, Globals, Instances};
 use inkwell::module::Linkage;
@@ -248,7 +250,8 @@ impl<'a> ArrayImpl<'a> for ZeroSizedArrayImpl<'a> {
             // let array = s.arg(0); UNUSED ARGUMENT
 
             if let Some(ProfileRc { record_retain, .. }) = tal.prof_rc {
-                s.call_void(record_retain, &[]);
+                let retain_counter = s.i64(increment_retain_counter() as u64);
+                s.call_void(record_retain, &[retain_counter]);
             }
 
             s.ret_void();
@@ -261,7 +264,8 @@ impl<'a> ArrayImpl<'a> for ZeroSizedArrayImpl<'a> {
 
             if self.mode == Mode::Owned {
                 if let Some(ProfileRc { record_retain, .. }) = tal.prof_rc {
-                    s.call_void(record_retain, &[]);
+                    let retain_counter = s.i64(increment_retain_counter() as u64);
+                    s.call_void(record_retain, &[retain_counter]);
                 }
             }
 
@@ -286,7 +290,8 @@ impl<'a> ArrayImpl<'a> for ZeroSizedArrayImpl<'a> {
             // let hole = s.arg(0); UNUSED ARGUMENT
 
             if let Some(ProfileRc { record_retain, .. }) = tal.prof_rc {
-                s.call_void(record_retain, &[]);
+                let retain_counter = s.i64(increment_retain_counter() as u64);
+                s.call_void(record_retain, &[retain_counter]);
             }
 
             s.ret_void();
@@ -299,7 +304,8 @@ impl<'a> ArrayImpl<'a> for ZeroSizedArrayImpl<'a> {
 
             if self.mode == Mode::Owned {
                 if let Some(ProfileRc { record_retain, .. }) = tal.prof_rc {
-                    s.call_void(record_retain, &[]);
+                    let retain_counter = s.i64(increment_retain_counter() as u64);
+                    s.call_void(record_retain, &[retain_counter]);
                 }
             }
 

@@ -491,6 +491,9 @@ pub fn write_expr<R, I: Id + 'static, J: Id + 'static>(
         annot::Expr::Panic(_ret_type, occur) => {
             write_single(w, context.type_renderer, write_res, "panic", occur)
         }
+        annot::Expr::Dup(_ret_type, occur) => {
+            write_single(w, context.type_renderer, write_res, "dup", occur)
+        }
         annot::Expr::ArrayLit(_type, elem_occurs) => {
             let elem_ids = elem_occurs.iter().map(|occur| occur.id).collect::<Vec<_>>();
 

@@ -4,6 +4,7 @@ pub mod cli;
 pub mod file_cache;
 pub mod progress_ui;
 pub mod pseudoprocess;
+pub mod globals;
 
 #[macro_use]
 mod util;
@@ -440,15 +441,16 @@ fn compile_to_low_ast(
     }
 
     // type_check_borrows::type_check(&interner, &rc_annot);
-
+    //transforming the AST: add dup to AST along the way:
     let rc_specialized =
         rc_specialize::rc_specialize(rc_annot, progress_ui::bar(progress, "rc_specialize"));
 
+    //transforming the AST: add dup to AST:
     let tail_rec = tail_call_elim::tail_call_elim(
         rc_specialized.clone(),
         progress_ui::bar(progress, "tail_call_elim"),
     );
-
+    //for pretty printing
     if let Some(artifact_dir) = artifact_dir {
         let mut out_file = fs::File::create(artifact_dir.artifact_path("tail_rec"))
             .map_err(ErrorKind::WriteIrFailed)?;

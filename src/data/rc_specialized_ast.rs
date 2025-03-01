@@ -133,7 +133,11 @@ pub enum Expr {
         ModeScheme, // Input
         LocalId,    // Message
     ),
-
+    Dup(
+        Type,       // Output
+        ModeScheme, // Input
+        LocalId,    // Message
+    ),
     ArrayLit(
         ModeScheme,   // Scheme of *item*
         Vec<LocalId>, // Elements
@@ -168,4 +172,5 @@ pub struct Program {
     pub schemes: IdVec<ModeSchemeId, ModeScheme>,
     pub profile_points: IdVec<prof::ProfilePointId, prof::ProfilePoint>,
     pub main: CustomFuncId,
+    //pub total_num_rcop: i64,
 }

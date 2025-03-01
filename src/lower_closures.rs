@@ -20,6 +20,7 @@ enum LeafFuncCase {
     ArrayReplace(special::Type),
     IoOp(res::IoOp),
     Panic(special::Type),
+    Dup(special::Type),
     Ctor(special::CustomTypeId, res::VariantId),
 }
 
@@ -237,6 +238,7 @@ fn is_atomic(expr: &special::Expr) -> bool {
         | special::Expr::ArrayOp(_, _, _)
         | special::Expr::IoOp(_, _)
         | special::Expr::Panic(_, _)
+        | special::Expr::Dup(_, _)
         | special::Expr::NullaryCtor(_, _)
         | special::Expr::Ctor(_, _, _)
         | special::Expr::Global(_)
@@ -284,6 +286,7 @@ impl<'a> Context<'a> {
             ))),
             LeafFuncCase::IoOp(_) => None,
             LeafFuncCase::Panic(_) => None,
+            LeafFuncCase::Dup(_) => None,
             LeafFuncCase::Ctor(_, _) => None,
         }
     }
@@ -576,6 +579,14 @@ impl<'a> Context<'a> {
                                 )
                             }
 
+                            LeafFuncCase::Dup(ret_type) => {
+                                debug_assert!(env_pat.is_none());
+
+                                let lowered_ret_type = self.lower_type(ret_type);
+
+                                first_ord::Expr::Dup(lowered_ret_type, Box::new(ARG_LOCAL.clone()))
+                            }
+
                             LeafFuncCase::Ctor(custom, variant) => {
                                 debug_assert!(env_pat.is_none());
 
@@ -795,6 +806,13 @@ impl<'a> Context<'a> {
                     Box::new(arg.clone()),
                 ));
             }
+
+            LeafFuncCase::Dup(ret_type) => {
+                return Some(first_ord::Expr::Dup(
+                    self.lower_type(&ret_type),
+                    Box::new(arg.clone()),
+                ));
+            }
             LeafFuncCase::Ctor(type_id, variant_id) => {
                 return Some(first_ord::Expr::Ctor(
                     self.mapping.map_custom_type(type_id),
@@ -840,6 +858,13 @@ impl<'a> Context<'a> {
                 let lowered_rep = self.lower_closure(rep);
                 let op_variant =
                     self.case_variant(lowered_rep, &LeafFuncCase::Panic(ret_type.clone()));
+                first_ord::Expr::Ctor(self.mapping.map_closure_type(lowered_rep), op_variant, None)
+            }
+
+            special::Expr::Dup(ret_type, rep) => {
+                let lowered_rep = self.lower_closure(rep);
+                let op_variant =
+                    self.case_variant(lowered_rep, &LeafFuncCase::Dup(ret_type.clone()));
                 first_ord::Expr::Ctor(self.mapping.map_closure_type(lowered_rep), op_variant, None)
             }
 

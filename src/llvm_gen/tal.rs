@@ -56,6 +56,7 @@ pub struct Tal<'a> {
     pub prof_clock_res_nanos: FunctionValue<'a>,
     pub prof_clock_nanos: FunctionValue<'a>,
     pub prof_report_init: FunctionValue<'a>,
+    pub prof_rc_init: FunctionValue<'a>,
     pub prof_report_write_string: FunctionValue<'a>,
     pub prof_report_write_u64: FunctionValue<'a>,
     pub prof_report_done: FunctionValue<'a>,
@@ -145,7 +146,6 @@ impl<'a> Tal<'a> {
             module.add_function("flush", i32_t.fn_type(&[], false), Some(Linkage::External));
 
         // Profiling primitives:
-
         let prof_clock_res_nanos = module.add_function(
             "prof_clock_res_nanos",
             i64_t.fn_type(&[], false),
@@ -166,6 +166,13 @@ impl<'a> Tal<'a> {
             void_t.fn_type(&[i8_ptr_t.into()], false),
             Some(Linkage::External),
         );
+
+        let prof_rc_init = module.add_function(
+            "prof_rc_init",
+            void_t.fn_type(&[i64_t.into()], false),
+            Some(Linkage::External),
+        );
+
         let prof_report_write_u64 = module.add_function(
             "prof_report_write_u64",
             void_t.fn_type(&[i64_t.into()], false),
@@ -215,7 +222,7 @@ impl<'a> Tal<'a> {
         let prof_rc = if profile_record_rc {
             let record_retain = module.add_function(
                 "prof_rc_record_retain",
-                void_t.fn_type(&[], false),
+                void_t.fn_type(&[i64_t.into()], false),
                 Some(Linkage::External),
             );
             let record_release = module.add_function(
@@ -274,6 +281,7 @@ impl<'a> Tal<'a> {
             prof_clock_res_nanos,
             prof_clock_nanos,
             prof_report_init,
+            prof_rc_init,
             prof_report_write_string,
             prof_report_write_u64,
             prof_report_done,

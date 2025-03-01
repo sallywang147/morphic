@@ -237,6 +237,7 @@ fn write_expr(
         },
 
         Expr::Panic(_ret_type, _input_type, local_id) => write_single(w, "panic", local_id),
+        Expr::Dup(_ret_type, _input_type, local_id) => write_single(w, "dup", local_id),
 
         Expr::BoolLit(val) => write![w, "{}", if *val { "True" } else { "False" }],
         Expr::ByteLit(val) => write![w, "{:?}", (*val as char)],

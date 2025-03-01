@@ -52,9 +52,18 @@ fn resolve_expr(
                 res::VariantId(1) => true,
                 res::VariantId(_) => unreachable!(),
             };
-
             mono::Expr::BoolLit(val)
         }
+        
+        typed::Expr::Global(res::GlobalId::Dup, args) => {
+            debug_assert_eq!(args.len(), 1);
+            mono::Expr::Panic(resolve_type(
+                type_insts,
+                inst_args,
+                &args[res::TypeParamId(0)],
+            ))
+        }
+
 
         typed::Expr::Global(res::GlobalId::Ctor(res::TypeId::Custom(id), variant), args) => {
             let args_resolved =
@@ -320,6 +329,7 @@ fn resolve_typedef(
 // TODO: Handle polymorphic recursion with a graceful error.  Currently, we enter an infinite loop
 // and consume all available memory.
 
+//add dup to each type program 
 pub fn monomorphize(program: typed::Program) -> mono::Program {
     let mut val_insts = ValInstances::new();
     let mut type_insts = TypeInstances::new();

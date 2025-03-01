@@ -140,7 +140,11 @@ pub enum Expr {
     WrapCustom(CustomTypeId, Occur),
     UnwrapCustom(CustomTypeId, Occur),
 
-    RcOp(RcOp, Selector, LocalId),
+    //RcOp is hwere dup and drop in AST: pass same ID to both:
+    //At this point we only have RcOp on the whole array, instead of each element
+    //If user were to insert dup; add ID in RcOp
+    //RcOp(RcOp, Selector, LocalId, index),
+    RcOp(RcOp, Selector, LocalId, i64),
 
     Intrinsic(Intrinsic, Occur),
     ArrayOp(ArrayOp),
@@ -149,7 +153,10 @@ pub enum Expr {
         ob::Type, // Output type
         Occur,    // Input
     ),
-
+    Dup(
+        ob::Type, // Output type
+        Occur,    // Input
+    ),
     ArrayLit(
         ob::Type,   // Item type
         Vec<Occur>, // Elements
@@ -191,4 +198,5 @@ pub struct Program {
     pub func_symbols: IdVec<ob::CustomFuncId, first_ord::FuncSymbols>,
     pub profile_points: IdVec<prof::ProfilePointId, prof::ProfilePoint>,
     pub main: ob::CustomFuncId,
+    pub total_num_rcop: i64,
 }

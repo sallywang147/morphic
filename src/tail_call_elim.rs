@@ -283,7 +283,9 @@ fn trans_expr(
         rc::Expr::Panic(ret_type, input_type, message) => {
             tail::Expr::Panic(ret_type.clone(), input_type.clone(), *message)
         }
-
+        rc::Expr::Dup(ret_type, input_type, message) => {
+            tail::Expr::Dup(ret_type.clone(), input_type.clone(), *message)
+        }
         rc::Expr::ArrayLit(scheme, items) => tail::Expr::ArrayLit(scheme.clone(), items.clone()),
 
         &rc::Expr::BoolLit(val) => tail::Expr::BoolLit(val),

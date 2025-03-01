@@ -1,5 +1,5 @@
 use std::convert::TryInto;
-
+use std::sync::atomic::{AtomicU64, Ordering};
 use crate::llvm_gen::tal::Tal;
 use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
@@ -8,6 +8,16 @@ use inkwell::targets::TargetData;
 use inkwell::types::{BasicTypeEnum, IntType};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::{AddressSpace, IntPredicate};
+
+
+// Define a global counter as a static variable
+pub static RETAIN_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+// Function to increment the counter and return its new value
+pub fn increment_retain_counter() -> u64 {
+    RETAIN_COUNTER.fetch_add(1, Ordering::SeqCst)
+}
+
 
 pub fn usize_t<'a>(context: &'a Context, target: &TargetData) -> IntType<'a> {
     let bits_per_byte = 8;

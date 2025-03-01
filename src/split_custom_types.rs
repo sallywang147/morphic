@@ -247,6 +247,11 @@ fn trans_expr(
             Box::new(trans_expr(typedefs, boxed_variants, message)),
         ),
 
+        first_ord::Expr::Dup(ret_type, message) => anon::Expr::Dup(
+            trans_type(ret_type),
+            Box::new(trans_expr(typedefs, boxed_variants, message)),
+        ),
+
         first_ord::Expr::Ctor(type_id, variant, content) => {
             let content_trans = match content {
                 Some(content) => trans_expr(typedefs, boxed_variants, content),

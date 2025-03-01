@@ -1,5 +1,18 @@
+use crate::cli;
+use crate::data::intrinsics as intrs;
+use crate::data::profile as prof;
 use crate::data::purity::Purity;
+use crate::data::raw_ast as raw;
+use crate::data::resolved_ast as res;
 use crate::data::visibility::Visibility;
+use crate::file_cache::FileCache;
+use crate::intrinsic_config::INTRINSIC_NAMES;
+use crate::lex;
+use crate::parse;
+use crate::parse_error;
+use crate::report_error::{locate_path, locate_span, Locate};
+use crate::resolve::res::GlobalId::Dup;
+use id_collections::IdVec;
 use lalrpop_util::ParseError;
 use once_cell::sync::Lazy;
 use std::collections::btree_map::Entry;
@@ -7,19 +20,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::iter;
 use std::path::{Path, PathBuf};
-
-use crate::cli;
-use crate::data::intrinsics as intrs;
-use crate::data::profile as prof;
-use crate::data::raw_ast as raw;
-use crate::data::resolved_ast as res;
-use crate::file_cache::FileCache;
-use crate::intrinsic_config::INTRINSIC_NAMES;
-use crate::lex;
-use crate::parse;
-use crate::parse_error;
-use crate::report_error::{locate_path, locate_span, Locate};
-use id_collections::IdVec;
 
 #[derive(Debug)]
 pub enum ErrorKind {
@@ -263,9 +263,15 @@ static BUILTIN_CTORS: Lazy<BTreeMap<raw::CtorName, (res::TypeId, res::VariantId)
 
         ctor_map
     });
+
+//the point of resolution path: ccoreesspondence between strins in user file
+//intrinsinc functions
 static BUILTIN_GLOBALS: Lazy<BTreeMap<raw::ValName, res::GlobalId>> = Lazy::new(|| {
     let mut global_map = BTreeMap::new();
+    //now you can write dup in morphic file
 
+    global_map.insert(raw::ValName("dup".to_owned()), res::GlobalId::Dup);
+    
     global_map.insert(
         raw::ValName("get".to_owned()),
         res::GlobalId::ArrayOp(res::ArrayOp::Get),
@@ -405,6 +411,7 @@ impl LocalContext {
     }
 }
 
+//first path to add dup: because it compiles to first
 pub fn resolve_program(
     files: &mut FileCache,
     file_path: &Path,

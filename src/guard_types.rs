@@ -643,6 +643,10 @@ fn guard_expr(
         flat::Expr::Panic(ret_ty, msg) => {
             guard::Expr::Panic(trans.guard(ret_ty), ctx.local_binding(*msg).new_id)
         }
+
+        flat::Expr::Dup(ret_ty, msg) => {
+            guard::Expr::Dup(trans.guard(ret_ty), ctx.local_binding(*msg).new_id)
+        }
         flat::Expr::ArrayLit(item_ty, items) => guard::Expr::ArrayLit(
             trans.guard(item_ty),
             items.map_refs(|item| ctx.local_binding(*item).new_id),

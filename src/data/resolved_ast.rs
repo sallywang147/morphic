@@ -32,6 +32,7 @@ pub struct VariantId(pub usize);
 pub struct TypeParamId(pub usize);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+//this is wherre operation is defined: intrinnsinc function: define dup next to ArrayOp
 pub enum GlobalId {
     Intrinsic(Intrinsic),
     ArrayOp(ArrayOp),
@@ -39,6 +40,7 @@ pub enum GlobalId {
     Panic,
     Ctor(TypeId, VariantId),
     Custom(CustomGlobalId),
+    Dup,
 }
 
 #[id_type]
@@ -52,7 +54,7 @@ pub enum IoOp {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ArrayOp {
-    Get,
+    Get, //these are specially defined: they got globalID - compiler intrinsics
     Extract,
     Len,
     Push,
@@ -61,16 +63,19 @@ pub enum ArrayOp {
 }
 
 #[id_type]
-pub struct LocalId(pub usize);
+pub struct LocalId(pub usize); //things you define in morphic (function I definede as user in
+                               //in .mor file) get localID
 
 #[derive(Clone, Debug)]
+//this is the first AST: returned by resolve
+//
 pub struct Program {
     pub mod_symbols: IdVec<ModId, ModSymbols>,
     pub custom_types: IdVec<CustomTypeId, TypeDef>,
     pub custom_type_symbols: IdVec<CustomTypeId, TypeSymbols>,
     pub profile_points: IdVec<prof::ProfilePointId, prof::ProfilePoint>,
-    pub vals: IdVec<CustomGlobalId, ValDef>,
-    pub val_symbols: IdVec<CustomGlobalId, ValSymbols>,
+    pub vals: IdVec<CustomGlobalId, ValDef>, //these are lamdas; values
+    pub val_symbols: IdVec<CustomGlobalId, ValSymbols>, //these are lamdas; values
     pub main: CustomGlobalId,
 }
 
@@ -132,6 +137,7 @@ pub struct TypeScheme {
 }
 
 #[derive(Clone, Debug)]
+//AST for expression
 pub enum Expr {
     Global(GlobalId),
     Local(LocalId),

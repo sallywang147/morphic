@@ -106,7 +106,7 @@ pub enum Expr {
     ArrayOp(ArrayOp),
     IoOp(IoOp),
     Panic(Type, Box<Expr>),
-
+    Dup(Type, Box<Expr>),
     ArrayLit(Type, Vec<Expr>),
     BoolLit(bool),
     ByteLit(u8),

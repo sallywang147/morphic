@@ -89,7 +89,7 @@ pub enum Expr {
     ArrayOp(ArrayOp),
     IoOp(IoOp),
     Panic(anon::Type, LocalId),
-
+    Dup(anon::Type, LocalId),
     ArrayLit(anon::Type, Vec<LocalId>),
     BoolLit(bool),
     ByteLit(u8),

@@ -699,8 +699,8 @@ declare_signatures! {
     pub array_get: (Array a m t, Int) -> u
         where t.lt <- u.lt, u.stack = t.access;
 
-    pub array_extract: (Array a Own t, Int) -> (u, HoleArray b Own t)
-        where t.lt <- u.lt, u.stack = t.storage;
+    pub array_extract: (Array a Own t, Int) -> (u, HoleArray b Own t) //takes an owned array and returns a owned array
+        where t.lt <- u.lt, u.stack = t.storage; //whatever the mode of content of the array, 
 
     /// Since the `len` field of an array lives on the stack, it's technically OK to read it after
     /// the array has been released (i.e. it's backing buffer has been deallocated). Therefore, we
@@ -734,4 +734,5 @@ declare_signatures! {
 
     /// Panic returns bottom, but it's convenient to model it as returning unit.
     pub panic: (Array a m Byte) -> ();
+    pub dup: (Array a m t) -> Array a Own t;
 }

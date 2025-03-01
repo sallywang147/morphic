@@ -3,7 +3,7 @@ use core::panic;
 use crate::data::mode_annot_ast::Mode;
 use crate::data::rc_specialized_ast::ModeScheme;
 use crate::llvm_gen::array::ArrayImpl;
-use crate::llvm_gen::fountain_pen::{scope, Scope};
+use crate::llvm_gen::fountain_pen::{increment_retain_counter, scope, Scope};
 use crate::llvm_gen::tal::{ProfileRc, Tal};
 use crate::llvm_gen::{gen_rc_op, get_llvm_type, DerivedRcOp, Globals, Instances};
 use inkwell::context::Context;
@@ -181,6 +181,7 @@ impl<'a> CowArrayImpl<'a> {
         );
 
         let release_hole = module.add_function(
+            //declaring an LLVM fnuction
             "builtin_cow_array_release_hole",
             void_type.fn_type(&[hole_array_type.into()], false),
             Some(Linkage::Internal),
@@ -456,15 +457,23 @@ impl<'a> ArrayImpl<'a> for CowArrayImpl<'a> {
             let me = s.arg(0);
 
             let refcount_ptr = data_to_buf(&s, s.field(me, F_ARR_DATA));
-
+            //this is linking with tal.c: does the following correspon with the condition
+            //in mod.rs: double check this!!!tal.prof_rc
+            //when is tal.prof_rc none???
             if let Some(ProfileRc { record_retain, .. }) = tal.prof_rc {
-                s.call_void(record_retain, &[]);
+                // Increment a counter in Rust each time record_retain is invoked
+                //static mut RETAIN_COUNTER: u32 = 0; // Define a mutable static counter
+                let retain_counter = s.i64(increment_retain_counter() as u64);
+                s.call_void(record_retain, &[retain_counter]);
+                //this is the original line:
+                //s.call_void(record_retain, &[]); //we only want to count rc when tal.prof_rc in some
+                //when it is some, only add a parameter/counter when it is some
             }
 
             s.if_(s.not(s.is_null(refcount_ptr)), |s| {
                 s.ptr_set(
                     refcount_ptr,
-                    s.add(s.ptr_get(s.i64_t(), refcount_ptr), s.i64(1)),
+                    s.add(s.ptr_get(s.i64_t(), refcount_ptr), s.i64(1)), //issuing an actual retain; add another line; synthesizing(incrementing) a counter; we do not want a
                 );
             });
 
@@ -480,13 +489,15 @@ impl<'a> ArrayImpl<'a> for CowArrayImpl<'a> {
 
             if self.mode == Mode::Owned {
                 if let Some(ProfileRc { record_retain, .. }) = tal.prof_rc {
-                    s.call_void(record_retain, &[]);
+                    let retain_counter = s.i64(increment_retain_counter() as u64);
+                    s.call_void(record_retain, &[retain_counter]);
+                    // s.call_void(record_retain, &[]);
                 }
 
                 s.if_(s.not(s.is_null(refcount_ptr)), |s| {
                     s.ptr_set(
                         refcount_ptr,
-                        s.add(s.ptr_get(s.i64_t(), refcount_ptr), s.i64(1)),
+                        s.add(s.ptr_get(s.i64_t(), refcount_ptr), s.i64(1)), //issuing a retain; add another line
                     );
                 });
             }
@@ -497,7 +508,7 @@ impl<'a> ArrayImpl<'a> for CowArrayImpl<'a> {
         // define 'release_array'
         {
             let s = scope(self.release_array, context, target);
-            let me = s.arg(0);
+            let me = s.arg(0); 
 
             let refcount_ptr = data_to_buf(&s, s.field(me, F_ARR_DATA));
 
@@ -563,7 +574,8 @@ impl<'a> ArrayImpl<'a> for CowArrayImpl<'a> {
 
             if self.mode == Mode::Owned {
                 if let Some(ProfileRc { record_release, .. }) = tal.prof_rc {
-                    s.call_void(record_release, &[]);
+                    //if the compiler is supposed to reccord rc content
+                    s.call_void(record_release, &[]); //we need to change args:&[]
                 }
 
                 s.if_(s.not(s.is_null(refcount_ptr)), |s| {
@@ -674,7 +686,8 @@ impl<'a> ArrayImpl<'a> for CowArrayImpl<'a> {
             s.ret_void();
         }
 
-        // define 'obtain_unique'
+        // define 'obtain_unique' //copy happnes here: print here to figure out slow down of merkle tree
+        //print in tal:
         {
             let s = scope(self.obtain_unique, context, target);
             let me = s.arg(0);

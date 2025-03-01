@@ -135,7 +135,10 @@ pub enum Expr {
         Type, // Return type
         Occur,
     ),
-
+    Dup(
+        Type, // Return type
+        Occur,
+    ),
     ArrayLit(Type, Vec<Occur>),
     BoolLit(bool),
     ByteLit(u8),

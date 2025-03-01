@@ -1832,6 +1832,54 @@ fn interpret_expr(
                 result
             }
 
+            Expr::Dup(_ret_type, input_scheme, array_id) => {
+                let array_heap_id = locals[array_id];
+
+                let Value::Array(_, ptr) = heap[array_heap_id] else {
+                    stacktrace.add_frame("dup").panic(format!(
+                        "expected an array received {:?}",
+                        heap[array_heap_id]
+                    ));
+                };
+
+                let result = match ptr {
+                    None => HeapId(0),
+
+                    Some(ptr) => {
+                        let array =
+                            unwrap_array_content(heap, ptr, stacktrace.add_frame("dup")).clone();
+
+                        let mut bytes = vec![];
+                        for heap_id in array {
+                            bytes.push(unwrap_byte(
+                                heap,
+                                heap_id,
+                                stacktrace.add_frame("dup byte"),
+                            ));
+                        }
+
+                        write!(
+                            stderr,
+                            "{}",
+                            String::from_utf8(bytes.iter().map(|&Wrapping(byte)| byte).collect())
+                                .expect("UTF-8 output error")
+                        )
+                        .expect("write failed");
+
+                        return Err(Interruption::Exit(ExitStatus::Failure(Some(1))));
+                    }
+                };
+
+                discard_owned_input(
+                    &program.schemes,
+                    heap,
+                    array_heap_id,
+                    input_scheme,
+                    stacktrace,
+                );
+                result
+            }
+
             Expr::BoolLit(val) => heap.add(Value::Bool(*val)),
 
             Expr::ByteLit(val) => heap.add(Value::Num(NumValue::Byte(Wrapping(*val)))),

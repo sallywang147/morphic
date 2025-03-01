@@ -339,6 +339,7 @@ impl<'a, 'b> Context<'a, 'b> {
                     self.write(" ()")?;
                 }
             }
+            GlobalId::Dup => self.write("dup")?,
         };
 
         Ok(())
@@ -977,6 +978,7 @@ fn add_func_deps(deps: &mut BTreeSet<CustomGlobalId>, expr: &Expr) {
             GlobalId::Custom(custom_id) => {
                 deps.insert(*custom_id);
             }
+            GlobalId::Dup => {}
         },
         Expr::Local(_) => {}
         Expr::Tuple(elems) => {

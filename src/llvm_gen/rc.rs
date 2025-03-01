@@ -1,6 +1,6 @@
 use crate::data::mode_annot_ast::Mode;
 use crate::data::rc_specialized_ast::ModeScheme;
-use crate::llvm_gen::fountain_pen::scope;
+use crate::llvm_gen::fountain_pen::{increment_retain_counter, scope};
 use crate::llvm_gen::tal::{ProfileRc, Tal};
 use crate::llvm_gen::{gen_rc_op, get_llvm_type, DerivedRcOp, Globals, Instances};
 use inkwell::module::{Linkage, Module};
@@ -128,7 +128,8 @@ impl<'a> RcBoxBuiltin<'a> {
             let rc = s.arg(0);
 
             if let Some(ProfileRc { record_retain, .. }) = tal.prof_rc {
-                s.call_void(record_retain, &[]);
+                let retain_counter = s.i64(increment_retain_counter() as u64);
+                s.call_void(record_retain, &[retain_counter]);
             }
 
             let new_refcount = s.add(s.arrow(self.rc_type, i64_t, rc, F_REFCOUNT), s.i64(1));
@@ -144,7 +145,8 @@ impl<'a> RcBoxBuiltin<'a> {
 
             if self.mode == Mode::Owned {
                 if let Some(ProfileRc { record_retain, .. }) = tal.prof_rc {
-                    s.call_void(record_retain, &[]);
+                    let retain_counter = s.i64(increment_retain_counter() as u64);
+                    s.call_void(record_retain, &[retain_counter]);
                 }
 
                 let new_refcount = s.add(s.arrow(self.rc_type, i64_t, rc, F_REFCOUNT), s.i64(1));

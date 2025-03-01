@@ -89,6 +89,7 @@ pub enum Expr {
         res::VariantId,
         Solution, // Representation of this function expressionn
     ),
+    Dup(Type<Solution>, Solution),
     Global(mono::CustomGlobalId, IdVec<RepParamId, Solution>),
     Local(lifted::LocalId),
     Capture(lifted::CaptureId),

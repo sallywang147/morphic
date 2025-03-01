@@ -116,6 +116,15 @@ fn typecheck_expr(
             );
             ret_type.clone()
         }
+
+        E::Dup(ret_type, message) => {
+            assert_eq!(
+                typecheck_expr(program, locals, &**message),
+                T::Array(Box::new(T::Num(ast::NumType::Byte)))
+            );
+            ret_type.clone()
+        }
+
         E::Ctor(type_id, variant_id, expr) => {
             assert_eq!(
                 program.custom_types[type_id].variants[variant_id],

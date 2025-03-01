@@ -113,7 +113,7 @@ enum TailExpr {
     ArrayOp(guard::ArrayOp),
     IoOp(guard::IoOp),
     Panic(guard::Type, LocalId),
-
+    Dup(guard::Type, LocalId),
     ArrayLit(guard::Type, Vec<LocalId>),
     BoolLit(bool),
     ByteLit(u8),
@@ -207,6 +207,7 @@ fn mark_tail_calls(
         guard::Expr::ArrayOp(op) => TailExpr::ArrayOp(op.clone()),
         guard::Expr::IoOp(op) => TailExpr::IoOp(*op),
         guard::Expr::Panic(ret_type, message) => TailExpr::Panic(ret_type.clone(), *message),
+        guard::Expr::Dup(ret_type, message) => TailExpr::Dup(ret_type.clone(), *message),
         guard::Expr::ArrayLit(item_type, items) => {
             TailExpr::ArrayLit(item_type.clone(), items.clone())
         }
@@ -1557,6 +1558,24 @@ fn instantiate_expr(
             annot::Expr::Panic(fut_ty.clone(), occurs.next().unwrap())
         }
 
+        TailExpr::Dup(_ret_ty, msg_id) => {
+            let occurs = instantiate_model(
+                &*model::dup,
+                strategy,
+                IgnorePerceus::Yes,
+                interner,
+                customs,
+                sccs,
+                constrs,
+                ctx,
+                &path,
+                &[*msg_id],
+                &TypeFo::unit(interner),
+            );
+            let mut occurs = occurs.into_iter();
+            annot::Expr::Dup(fut_ty.clone(), occurs.next().unwrap())
+        }
+
         TailExpr::ArrayLit(_item_ty, item_ids) => {
             let occurs = instantiate_model(
                 &*model::array_new,
@@ -1861,6 +1880,11 @@ fn extract_expr(
         E::Panic(ret_ty, msg) => {
             E::Panic(extract_type(solution, ret_ty), extract_occur(solution, msg))
         }
+
+        E::Dup(ret_ty, msg) => {
+            E::Dup(extract_type(solution, ret_ty), extract_occur(solution, msg))
+        }
+
         E::ArrayLit(item_ty, items) => E::ArrayLit(
             extract_type(solution, item_ty),
             items

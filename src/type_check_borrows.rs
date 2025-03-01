@@ -164,13 +164,13 @@ fn type_check_expr(
                 // XXX: Lifetimes were computed in the pass before retain/release insertion, so we
                 // need to update `path` as if the retains/releases are not present.
                 match expr {
-                    Expr::RcOp(RcOp::Retain, selector, local_id) => {
+                    Expr::RcOp(RcOp::Retain, selector, local_id, _index) => {
                         let local_info = ctx.local_binding_mut(*local_id);
                         for &slot in &selector.true_ {
                             local_info.moves.inc(slot);
                         }
                     }
-                    Expr::RcOp(RcOp::Release, selector, local_id) => {
+                    Expr::RcOp(RcOp::Release, selector, local_id, _index) => {
                         let effective_i = i.saturating_sub(1);
                         let local_info = ctx.local_binding_mut(*local_id);
                         for &slot in &selector.true_ {
@@ -306,7 +306,7 @@ fn type_check_expr(
         Expr::UnwrapCustom(_custom_type_id, local) => {
             record_moves(customs, ctx, local);
         }
-        Expr::RcOp(_op, _selector, _local_id) => {
+        Expr::RcOp(_op, _selector, _local_id, _index) => {
             panic!("the type checker should handle `RcOp` in `LetMany`")
         }
         Expr::Intrinsic(_intr, _local_id) => {}
@@ -349,6 +349,10 @@ fn type_check_expr(
             assert_all_borrowed(customs, &local.ty);
         }
         Expr::Panic(output_ty, local) => {
+            assert_eq!(output_ty, ret_ty);
+            assert_all_borrowed(customs, &local.ty);
+        }
+        Expr::Dup(output_ty, local) => {
             assert_eq!(output_ty, ret_ty);
             assert_all_borrowed(customs, &local.ty);
         }

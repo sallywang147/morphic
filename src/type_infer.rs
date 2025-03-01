@@ -590,6 +590,7 @@ pub fn global_scheme(program: &res::Program, global: res::GlobalId) -> Cow<res::
         res::GlobalId::Ctor(_, _) => unreachable!(),
 
         res::GlobalId::Custom(custom) => Cow::Borrowed(&program.vals[custom].scheme),
+        res::GlobalId::Dup => Cow::Owned(scheme(1, func(param(0), param(0)))),
     }
 }
 
@@ -1066,6 +1067,23 @@ fn infer_def(
     })
 }
 
+/***
+ * we get the following from inboking resolve_program
+ * //this is the first AST: returned by resolve
+ res:Porgram is below:
+pub struct Program {
+    pub mod_symbols: IdVec<ModId, ModSymbols>,
+    pub custom_types: IdVec<CustomTypeId, TypeDef>,
+    pub custom_type_symbols: IdVec<CustomTypeId, TypeSymbols>,
+    pub profile_points: IdVec<prof::ProfilePointId, prof::ProfilePoint>,
+    pub vals: IdVec<CustomGlobalId, ValDef>,
+    pub val_symbols: IdVec<CustomGlobalId, ValSymbols>,
+    pub main: CustomGlobalId,
+}
+the func below maps from resolved program and typed program
+we only need to touch where it returns typed errors
+ */
+//this produced the type AST
 pub fn type_infer(program: res::Program) -> Result<typed::Program, Error> {
     let vals_inferred = program.vals.try_map_refs(|id, def| {
         let val_symbols = &program.val_symbols[id];

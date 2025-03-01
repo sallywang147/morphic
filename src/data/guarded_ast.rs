@@ -180,7 +180,7 @@ pub enum Expr {
     ArrayOp(ArrayOp),
     IoOp(IoOp),
     Panic(Type, LocalId),
-
+    Dup(Type, LocalId),
     ArrayLit(Type, Vec<LocalId>),
     BoolLit(bool),
     ByteLit(u8),

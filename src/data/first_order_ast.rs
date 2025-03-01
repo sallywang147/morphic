@@ -93,6 +93,7 @@ pub enum Expr {
     ArrayOp(ArrayOp),
     IoOp(IoOp),
     Panic(Type, Box<Expr>),
+    Dup(Type, Box<Expr>),
     Ctor(CustomTypeId, VariantId, Option<Box<Expr>>),
     Local(LocalId),
     Tuple(Vec<Expr>),

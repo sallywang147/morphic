@@ -348,6 +348,11 @@ fn solve_expr(
             annot::Expr::Panic(ret_ty, msg)
         }
 
+        annot::Expr::Dup(ret_ty, msg) => {
+            let ret_ty = solve_type(inst_params, ret_ty);
+            let msg = solve_occur(inst_params, msg);
+            annot::Expr::Dup(ret_ty, msg)
+        }
         annot::Expr::ArrayLit(item_ty, items) => {
             let item_ty = solve_type(inst_params, item_ty);
             let items = items
@@ -1333,6 +1338,19 @@ fn annot_expr(
             );
             let mut occurs = occurs.into_iter();
             Expr::Panic(fut_ty.clone(), occurs.next().unwrap())
+        }
+
+        annot::Expr::Dup(_ret_ty, msg) => {
+            let occurs = instantiate_model(
+                &*model::dup,
+                interner,
+                ctx,
+                path,
+                &[msg],
+                &Type::unit(interner),
+            );
+            let mut occurs = occurs.into_iter();
+            Expr::Dup(fut_ty.clone(), occurs.next().unwrap())
         }
 
         annot::Expr::ArrayLit(_item_ty, items) => {

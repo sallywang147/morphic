@@ -155,7 +155,7 @@ fn write_expr(w: &mut dyn Write, expr: &Expr, context: Context) -> io::Result<()
 
                     index += 1;
                     match binding_expr {
-                        Expr::RcOp(_, _, _) => {}
+                        Expr::RcOp(_, _, _, _) => {}
                         _ => {
                             real_index += 1;
                         }
@@ -225,13 +225,13 @@ fn write_expr(w: &mut dyn Write, expr: &Expr, context: Context) -> io::Result<()
             )?;
             write_occur(w, context.type_renderer, occur)
         }
-        Expr::RcOp(RcOp::Retain, selector, local) => {
+        Expr::RcOp(RcOp::Retain, selector, local, _) => {
             write!(w, "retain ")?;
             write!(w, "%{} (", local.0)?;
             write_selector(Some(context.type_renderer), w, selector)?;
             write!(w, ")")
         }
-        Expr::RcOp(RcOp::Release, selector, local) => {
+        Expr::RcOp(RcOp::Release, selector, local, _) => {
             write!(w, "release ")?;
             write!(w, "%{} (", local.0)?;
             write_selector(Some(context.type_renderer), w, selector)?;
@@ -265,6 +265,7 @@ fn write_expr(w: &mut dyn Write, expr: &Expr, context: Context) -> io::Result<()
             IoOp::Output(occur) => write_single(w, context.type_renderer, "output", occur),
         },
         Expr::Panic(_ret_type, occur) => write_single(w, context.type_renderer, "panic", occur),
+        Expr::Dup(_ret_type, occur) => write_single(w, context.type_renderer, "dup", occur),
         Expr::ArrayLit(_type, elem_occurs) => {
             let elem_ids = elem_occurs.iter().map(|occur| occur.id).collect::<Vec<_>>();
 
