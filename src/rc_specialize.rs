@@ -622,14 +622,6 @@ fn lower_expr(
             rc::Expr::Panic(lower_type(&ret_ty.shape()), input_scheme, new_id(ctx, &msg))
         }
 
-        annot::Expr::Dup(ret_ty, msg) => {
-            let input_scheme = make_scheme(
-                insts,
-                &msg.ty.shape(),
-                &prepare_value_res(msg.ty.res().as_slice()),
-            );
-            rc::Expr::Dup(lower_type(&ret_ty.shape()), input_scheme, new_id(ctx, &msg))
-        }
         annot::Expr::ArrayLit(item_ty, items) => {
             let scheme = make_scheme(
                 insts,

@@ -352,10 +352,6 @@ fn type_check_expr(
             assert_eq!(output_ty, ret_ty);
             assert_all_borrowed(customs, &local.ty);
         }
-        Expr::Dup(output_ty, local) => {
-            assert_eq!(output_ty, ret_ty);
-            assert_all_borrowed(customs, &local.ty);
-        }
         Expr::ArrayLit(_item_ty, items) => {
             // TODO: assert the right thing about the item type
             // let item_ty = extract_item_type(ret_ty);

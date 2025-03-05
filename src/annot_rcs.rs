@@ -141,9 +141,8 @@ fn build_rc_op(
     target_ty: &Type,
     target: LocalId,
     builder: &mut Builder,
-    index: i64, //anyone who calls this funncion should give index: no mut
+    index: &mut i64, //anyone who calls this funncion should give index: no mut
 ) {
-    
     let owned = target_ty
         .res()
         .iter()
@@ -153,7 +152,7 @@ fn build_rc_op(
         })
         .collect::<BTreeSet<_>>();
     //if any fields we want to ddup, we add an RcOp
-    index += 1;
+    *index += 1;
     if slots.true_.intersection(&owned).any(|_| true) {
         builder.add_binding(
             /***
@@ -161,7 +160,7 @@ fn build_rc_op(
              * RcOp(op, slots, target, index)
              */
             annot::Type::unit(interner),
-            rc::Expr::RcOp(op, slots, target, index), //creating RC in the AST
+            rc::Expr::RcOp(op, slots, target, *index), //creating RC in the AST
         );
     }
 }
@@ -582,7 +581,7 @@ fn annot_occur(
     path: &Path,
     occur: ob::Occur,
     builder: &mut Builder,
-    index: i64,
+    index: &mut i64,
 ) -> (Occur, Moves) {
     let binding = ctx.local_binding_mut(occur.id).clone();
     let new_occur = Occur {
@@ -647,17 +646,18 @@ fn annot_expr(
     metadata: Metadata,
     drops: Option<&BodyDrops>,
     builder: &mut Builder,
-    index: i64,
+    mut index: &mut i64,
 ) -> (rc::LocalId, Moves) {
     let (new_expr, moves) = match expr {
         ob::Expr::Local(local) => {
             let (new_local, moves) =
-                annot_occur(interner, customs, ctx, path, local, builder, index);
+                annot_occur(interner, customs, ctx, path, local, builder, &mut index);
             (rc::Expr::Local(new_local), moves)
         }
 
         ob::Expr::Call(purity, func_id, arg) => {
-            let (new_arg, moves) = annot_occur(interner, customs, ctx, path, arg, builder, index);
+            let (new_arg, moves) =
+                annot_occur(interner, customs, ctx, path, arg, builder, &mut index);
             (rc::Expr::Call(purity, func_id, new_arg), moves)
         }
 
@@ -711,7 +711,7 @@ fn annot_expr(
                             &as_value_type(&binding.ty),
                             binding.new_id,
                             builder,
-                            index,
+                            &mut index,
                         );
                     }
 
@@ -753,7 +753,7 @@ fn annot_expr(
                         &as_value_type(&binding.ty),
                         binding.new_id,
                         &mut case_builder,
-                        index,
+                        &mut index,
                     );
                 }
 
@@ -792,7 +792,7 @@ fn annot_expr(
             );
 
             let (new_discrim, discrim_moves) =
-                annot_occur(interner, customs, ctx, path, discrim, builder, index);
+                annot_occur(interner, customs, ctx, path, discrim, builder, &mut index);
 
             let mut moves = then_moves;
             moves.merge(else_moves);
@@ -806,7 +806,7 @@ fn annot_expr(
 
         ob::Expr::CheckVariant(variant_id, variant) => {
             let (new_variant, moves) =
-                annot_occur(interner, customs, ctx, path, variant, builder, index);
+                annot_occur(interner, customs, ctx, path, variant, builder, &mut index);
             (rc::Expr::CheckVariant(variant_id, new_variant), moves)
         }
 
@@ -817,7 +817,15 @@ fn annot_expr(
                 .into_iter()
                 .enumerate()
                 .map(|(i, field)| {
-                    annot_occur(interner, customs, ctx, &path.seq(i), field, builder, index)
+                    annot_occur(
+                        interner,
+                        customs,
+                        ctx,
+                        &path.seq(i),
+                        field,
+                        builder,
+                        &mut index,
+                    )
                 })
                 .unzip();
             let moves = moves.into_iter().fold(Moves::empty(), |mut acc, m| {
@@ -829,12 +837,12 @@ fn annot_expr(
 
         ob::Expr::TupleField(tuple, idx) => {
             let (new_tuple, moves) =
-                annot_occur(interner, customs, ctx, path, tuple, builder, index);
+                annot_occur(interner, customs, ctx, path, tuple, builder, &mut index);
             (rc::Expr::TupleField(new_tuple, idx), moves)
         }
         ob::Expr::WrapVariant(variants, variant_id, content) => {
             let (new_content, moves) =
-                annot_occur(interner, customs, ctx, path, content, builder, index);
+                annot_occur(interner, customs, ctx, path, content, builder, &mut index);
             (
                 rc::Expr::WrapVariant(variants, variant_id, new_content),
                 moves,
@@ -843,13 +851,13 @@ fn annot_expr(
 
         ob::Expr::UnwrapVariant(variant_id, wrapped) => {
             let (new_wrapped, moves) =
-                annot_occur(interner, customs, ctx, path, wrapped, builder, index);
+                annot_occur(interner, customs, ctx, path, wrapped, builder, &mut index);
             (rc::Expr::UnwrapVariant(variant_id, new_wrapped), moves)
         }
 
         ob::Expr::WrapBoxed(content, output_ty) => {
             let (new_content, moves) =
-                annot_occur(interner, customs, ctx, path, content, builder, index);
+                annot_occur(interner, customs, ctx, path, content, builder, &mut index);
             (rc::Expr::WrapBoxed(new_content, output_ty), moves)
         }
 
@@ -857,7 +865,7 @@ fn annot_expr(
             let item_retains = select_owned(customs, &output_ty);
 
             let (new_wrapped, moves) =
-                annot_occur(interner, customs, ctx, path, wrapped, builder, index);
+                annot_occur(interner, customs, ctx, path, wrapped, builder, &mut index);
 
             let binding_ty = add_unused_stack_lts(customs, &output_ty);
             let binding_ty_as_value = as_value_type(&binding_ty);
@@ -871,35 +879,50 @@ fn annot_expr(
                 &binding_ty_as_value,
                 unwrap_id,
                 builder,
-                index,
+                &mut index,
             );
             return (unwrap_id, moves);
         }
 
         ob::Expr::WrapCustom(id, _recipe, content) => {
             let (new_content, moves) =
-                annot_occur(interner, customs, ctx, path, content, builder, index);
+                annot_occur(interner, customs, ctx, path, content, builder, &mut index);
             (rc::Expr::WrapCustom(id, new_content), moves)
         }
 
         ob::Expr::UnwrapCustom(id, _recipe, wrapped) => {
             let (new_wrapped, moves) =
-                annot_occur(interner, customs, ctx, path, wrapped, builder, index);
+                annot_occur(interner, customs, ctx, path, wrapped, builder, &mut index);
             (rc::Expr::UnwrapCustom(id, new_wrapped), moves)
         }
 
         ob::Expr::Intrinsic(intr, arg) => {
-            let (new_arg, moves) = annot_occur(interner, customs, ctx, path, arg, builder, index);
+            let (new_arg, moves) =
+                annot_occur(interner, customs, ctx, path, arg, builder, &mut index);
             (rc::Expr::Intrinsic(intr, new_arg), moves)
         }
 
         ob::Expr::ArrayOp(ob::ArrayOp::Get(arr, idx, ret_ty)) => {
             let item_retains = select_owned(customs, &ret_ty);
 
-            let (new_arr, moves1) =
-                annot_occur(interner, customs, ctx, &path.seq(0), arr, builder, index);
-            let (new_idx, moves2) =
-                annot_occur(interner, customs, ctx, &path.seq(1), idx, builder, index);
+            let (new_arr, moves1) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(0),
+                arr,
+                builder,
+                &mut index,
+            );
+            let (new_idx, moves2) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(1),
+                idx,
+                builder,
+                &mut index,
+            );
 
             let mut moves = moves1;
             moves.merge(moves2);
@@ -914,16 +937,30 @@ fn annot_expr(
                 &ret_ty,
                 get_id,
                 builder,
-                index,
+                &mut index,
             );
             return (get_id, moves);
         }
 
         ob::Expr::ArrayOp(ob::ArrayOp::Extract(arr, idx)) => {
-            let (new_arr, moves1) =
-                annot_occur(interner, customs, ctx, &path.seq(0), arr, builder, index);
-            let (new_idx, moves2) =
-                annot_occur(interner, customs, ctx, &path.seq(1), idx, builder, index);
+            let (new_arr, moves1) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(0),
+                arr,
+                builder,
+                &mut index,
+            );
+            let (new_idx, moves2) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(1),
+                idx,
+                builder,
+                &mut index,
+            );
 
             let mut moves = moves1;
             moves.merge(moves2);
@@ -935,15 +972,30 @@ fn annot_expr(
         }
 
         ob::Expr::ArrayOp(ob::ArrayOp::Len(arr)) => {
-            let (new_arr, moves) = annot_occur(interner, customs, ctx, path, arr, builder, index);
+            let (new_arr, moves) =
+                annot_occur(interner, customs, ctx, path, arr, builder, &mut index);
             (rc::Expr::ArrayOp(rc::ArrayOp::Len(new_arr)), moves)
         }
 
         ob::Expr::ArrayOp(ob::ArrayOp::Push(arr, item)) => {
-            let (new_arr, moves1) =
-                annot_occur(interner, customs, ctx, &path.seq(0), arr, builder, index);
-            let (new_item, moves2) =
-                annot_occur(interner, customs, ctx, &path.seq(1), item, builder, index);
+            let (new_arr, moves1) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(0),
+                arr,
+                builder,
+                &mut index,
+            );
+            let (new_item, moves2) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(1),
+                item,
+                builder,
+                &mut index,
+            );
 
             let mut moves = moves1;
             moves.merge(moves2);
@@ -955,15 +1007,30 @@ fn annot_expr(
         }
 
         ob::Expr::ArrayOp(ob::ArrayOp::Pop(arr)) => {
-            let (new_arr, moves) = annot_occur(interner, customs, ctx, path, arr, builder, index);
+            let (new_arr, moves) =
+                annot_occur(interner, customs, ctx, path, arr, builder, &mut index);
             (rc::Expr::ArrayOp(rc::ArrayOp::Pop(new_arr)), moves)
         }
 
         ob::Expr::ArrayOp(ob::ArrayOp::Replace(arr, item)) => {
-            let (new_arr, moves1) =
-                annot_occur(interner, customs, ctx, &path.seq(0), arr, builder, index);
-            let (new_item, moves2) =
-                annot_occur(interner, customs, ctx, &path.seq(1), item, builder, index);
+            let (new_arr, moves1) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(0),
+                arr,
+                builder,
+                &mut index,
+            );
+            let (new_item, moves2) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(1),
+                item,
+                builder,
+                &mut index,
+            );
 
             let mut moves = moves1;
             moves.merge(moves2);
@@ -975,10 +1042,24 @@ fn annot_expr(
         }
 
         ob::Expr::ArrayOp(ob::ArrayOp::Reserve(arr, cap)) => {
-            let (new_arr, moves1) =
-                annot_occur(interner, customs, ctx, &path.seq(0), arr, builder, index);
-            let (new_cap, moves2) =
-                annot_occur(interner, customs, ctx, &path.seq(1), cap, builder, index);
+            let (new_arr, moves1) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(0),
+                arr,
+                builder,
+                &mut index,
+            );
+            let (new_cap, moves2) = annot_occur(
+                interner,
+                customs,
+                ctx,
+                &path.seq(1),
+                cap,
+                builder,
+                &mut index,
+            );
 
             let mut moves = moves1;
             moves.merge(moves2);
@@ -992,26 +1073,33 @@ fn annot_expr(
         ob::Expr::IoOp(ob::IoOp::Input) => (rc::Expr::IoOp(rc::IoOp::Input), Moves::empty()),
 
         ob::Expr::IoOp(ob::IoOp::Output(val)) => {
-            let (new_val, moves) = annot_occur(interner, customs, ctx, path, val, builder, index);
+            let (new_val, moves) =
+                annot_occur(interner, customs, ctx, path, val, builder, &mut index);
             (rc::Expr::IoOp(rc::IoOp::Output(new_val)), moves)
         }
 
         ob::Expr::Panic(ret_ty, msg) => {
-            let (new_msg, moves) = annot_occur(interner, customs, ctx, path, msg, builder, index);
+            let (new_msg, moves) =
+                annot_occur(interner, customs, ctx, path, msg, builder, &mut index);
             (rc::Expr::Panic(ret_ty, new_msg), moves)
         }
 
         ob::Expr::Dup(ret_ty, input) => {
+            let binding = ctx.local_binding(input.id);
             build_rc_op(
                 interner,
                 RcOp::Retain,
-                Selector::all(input.ty.shape()),
+                Selector::all(customs, input.ty.shape()),
                 &ret_ty,
-                input.id,
+                binding.new_id,
                 builder,
-                index,
+                &mut index,
             );
             let moves = Moves::empty();
+            let input = Occur {
+                id: binding.new_id,
+                ty: input.ty.clone(),
+            };
             (rc::Expr::Local(input), moves)
         }
         ob::Expr::ArrayLit(item_ty, items) => {
@@ -1021,7 +1109,9 @@ fn annot_expr(
                 .enumerate()
                 .map(|(i, item)| {
                     let item_path = if n > 1 { path.seq(i) } else { path.clone() };
-                    annot_occur(interner, customs, ctx, &item_path, item, builder, index)
+                    annot_occur(
+                        interner, customs, ctx, &item_path, item, builder, &mut index,
+                    )
                 })
                 .unzip();
 
@@ -1054,7 +1144,7 @@ fn annot_func(
     customs: &ob::CustomTypes,
     func_id: ob::CustomFuncId,
     func: ob::FuncDef,
-    index: i64,
+    index: &mut i64,
 ) -> rc::FuncDef {
     let drops = drops_for_func(interner, customs, &func);
 
@@ -1119,7 +1209,7 @@ pub fn annot_rcs(
             .funcs
             .into_iter()
             .map(|(func_id, func)| {
-                let index = GLOBAL_INDEX.fetch_add(1, Ordering::SeqCst);
+                let index = &mut GLOBAL_INDEX.fetch_add(1, Ordering::SeqCst);
                 let annot = annot_func(
                     interner,
                     &func_renderer,

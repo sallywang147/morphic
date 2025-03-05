@@ -11,7 +11,6 @@ use crate::lex;
 use crate::parse;
 use crate::parse_error;
 use crate::report_error::{locate_path, locate_span, Locate};
-use crate::resolve::res::GlobalId::Dup;
 use id_collections::IdVec;
 use lalrpop_util::ParseError;
 use once_cell::sync::Lazy;

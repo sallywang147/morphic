@@ -1571,7 +1571,7 @@ fn instantiate_expr(
                     ResModes::Stack(stack) => {
                         constrs.require_le_const(&Mode::Owned, *stack);
                     }
-                    ResModes::Heap(heap) => {}
+                    ResModes::Heap(_heap) => {}
                 }
             }
             annot::Expr::Dup(

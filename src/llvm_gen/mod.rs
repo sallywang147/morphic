@@ -31,7 +31,7 @@ use crate::llvm_gen::zero_sized_array::ZeroSizedArrayImpl;
 use crate::pretty_print::utils::TailFuncRenderer;
 use crate::pseudoprocess::{spawn_process, Child, Stdio, ValgrindConfig};
 use crate::util::progress_logger::{ProgressLogger, ProgressSession};
-use crate::{cli, lower_closures, progress_ui};
+use crate::{cli, progress_ui};
 use find_clang::find_default_clang;
 use id_collections::IdVec;
 use id_graph_sccs::{SccKind, Sccs};
@@ -2157,7 +2157,6 @@ fn gen_program<'a>(
 
     for (func_id, func) in &funcs {
         gen_function(
-            ///index,
             &context,
             &mut instances,
             &globals,

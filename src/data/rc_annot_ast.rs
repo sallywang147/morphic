@@ -27,11 +27,12 @@ impl Selector {
     pub fn one(shape: &Shape, slot: SlotId) -> Selector {
         Selector {
             shape: shape.clone(),
-            true_: std::iter::once(slot).collect(),
+            true_: std::iter::once(slot).collect(), 
         }
     }
-
-    pub fn all(shape: &Shape) -> Selector {
+     //program.
+     //AST map
+    pub fn all(customs: &ob::CustomTypes, shape: &Shape) -> Selector {
         Selector {
             shape: shape.clone(),
             true_: shape.top_level_slots(customs.view_shapes()),
