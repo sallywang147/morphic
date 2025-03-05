@@ -141,9 +141,9 @@ fn build_rc_op(
     target_ty: &Type,
     target: LocalId,
     builder: &mut Builder,
-    mut index: i64, //anyone who calls this funncion should give index
+    index: i64, //anyone who calls this funncion should give index: no mut
 ) {
-    //
+    
     let owned = target_ty
         .res()
         .iter()
@@ -1001,9 +1001,18 @@ fn annot_expr(
             (rc::Expr::Panic(ret_ty, new_msg), moves)
         }
 
-        ob::Expr::Dup(ret_ty, msg) => {
-            let (new_msg, moves) = annot_occur(interner, customs, ctx, path, msg, builder, index);
-            (rc::Expr::Dup(ret_ty, new_msg), moves)
+        ob::Expr::Dup(ret_ty, input) => {
+            build_rc_op(
+                interner,
+                RcOp::Retain,
+                Selector::all(input.ty.shape()),
+                &ret_ty,
+                input.id,
+                builder,
+                index,
+            );
+            let moves = Moves::empty();
+            (rc::Expr::Local(input), moves)
         }
         ob::Expr::ArrayLit(item_ty, items) => {
             let n = items.len();

@@ -265,7 +265,7 @@ fn write_expr(w: &mut dyn Write, expr: &Expr, context: Context) -> io::Result<()
             IoOp::Output(occur) => write_single(w, context.type_renderer, "output", occur),
         },
         Expr::Panic(_ret_type, occur) => write_single(w, context.type_renderer, "panic", occur),
-        Expr::Dup(_ret_type, occur) => write_single(w, context.type_renderer, "dup", occur),
+        //Expr::Dup(_ret_type, occur) => write_single(w, context.type_renderer, "dup", occur),
         Expr::ArrayLit(_type, elem_occurs) => {
             let elem_ids = elem_occurs.iter().map(|occur| occur.id).collect::<Vec<_>>();
 

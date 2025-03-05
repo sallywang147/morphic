@@ -31,7 +31,7 @@ use crate::llvm_gen::zero_sized_array::ZeroSizedArrayImpl;
 use crate::pretty_print::utils::TailFuncRenderer;
 use crate::pseudoprocess::{spawn_process, Child, Stdio, ValgrindConfig};
 use crate::util::progress_logger::{ProgressLogger, ProgressSession};
-use crate::{cli, progress_ui};
+use crate::{cli, lower_closures, progress_ui};
 use find_clang::find_default_clang;
 use id_collections::IdVec;
 use id_graph_sccs::{SccKind, Sccs};
@@ -1697,19 +1697,19 @@ fn gen_expr<'a, 'b>(
     }
 }
 
-
 fn gen_function<'a, 'b>(
-    //index 
-    context: &'a Context, //we can also put index here 
+    //index: i64,
+    context: &'a Context, //we can also put index here
     instances: &mut Instances<'a>,
     globals: &Globals<'a, 'b>,
     func_decl: FunctionValue<'a>,
     funcs: &IdVec<low::CustomFuncId, FunctionValue<'a>>,
     func_id: low::CustomFuncId,
-    func: &low::FuncDef, //user function 
+    func: &low::FuncDef, //user function
 ) {
-    //increment index ehre: index++; 
-    //cancel prior index increment; 
+    //increment index ehre:
+    //index++;
+    //cancel prior index increment;
     let builder = context.create_builder();
     let entry = context.append_basic_block(func_decl, "entry");
     builder.position_at_end(entry);
@@ -1910,7 +1910,7 @@ fn gen_function<'a, 'b>(
 
     // Generate main body
     {
-        //increment the counter here 
+        //increment the counter here
         let mut locals = IdVec::from_vec(vec![func_decl.get_nth_param(0).unwrap()]);
         let ret_value = gen_expr(
             //index;
@@ -2157,6 +2157,7 @@ fn gen_program<'a>(
 
     for (func_id, func) in &funcs {
         gen_function(
+            ///index,
             &context,
             &mut instances,
             &globals,

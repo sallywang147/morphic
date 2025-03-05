@@ -1558,22 +1558,29 @@ fn instantiate_expr(
             annot::Expr::Panic(fut_ty.clone(), occurs.next().unwrap())
         }
 
-        TailExpr::Dup(_ret_ty, msg_id) => {
-            let occurs = instantiate_model(
-                &*model::dup,
+        TailExpr::Dup(_ret_ty, input_id) => {
+            let occur_ty = freshen_type(
                 strategy,
                 IgnorePerceus::Yes,
-                interner,
-                customs,
-                sccs,
                 constrs,
-                ctx,
-                &path,
-                &[*msg_id],
-                &TypeFo::unit(interner),
+                || path.as_lt(&interner),
+                &ctx.local_binding(*input_id).ty,
             );
-            let mut occurs = occurs.into_iter();
-            annot::Expr::Dup(fut_ty.clone(), occurs.next().unwrap())
+            for modes in fut_ty.iter_modes() {
+                match modes {
+                    ResModes::Stack(stack) => {
+                        constrs.require_le_const(&Mode::Owned, *stack);
+                    }
+                    ResModes::Heap(heap) => {}
+                }
+            }
+            annot::Expr::Dup(
+                fut_ty.clone(),
+                Occur {
+                    id: *input_id,
+                    ty: occur_ty,
+                },
+            )
         }
 
         TailExpr::ArrayLit(_item_ty, item_ids) => {
@@ -1881,9 +1888,7 @@ fn extract_expr(
             E::Panic(extract_type(solution, ret_ty), extract_occur(solution, msg))
         }
 
-        E::Dup(ret_ty, msg) => {
-            E::Dup(extract_type(solution, ret_ty), extract_occur(solution, msg))
-        }
+        E::Dup(ret_ty, msg) => E::Dup(extract_type(solution, ret_ty), extract_occur(solution, msg)),
 
         E::ArrayLit(item_ty, items) => E::ArrayLit(
             extract_type(solution, item_ty),

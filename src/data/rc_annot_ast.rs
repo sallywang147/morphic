@@ -31,6 +31,13 @@ impl Selector {
         }
     }
 
+    pub fn all(shape: &Shape) -> Selector {
+        Selector {
+            shape: shape.clone(),
+            true_: shape.top_level_slots(customs.view_shapes()),
+        }
+    }
+
     pub fn insert(&mut self, slot: SlotId) {
         self.true_.insert(slot);
     }
@@ -143,17 +150,12 @@ pub enum Expr {
     //RcOp is hwere dup and drop in AST: pass same ID to both:
     //At this point we only have RcOp on the whole array, instead of each element
     //If user were to insert dup; add ID in RcOp
-    //RcOp(RcOp, Selector, LocalId, index),
     RcOp(RcOp, Selector, LocalId, i64),
 
     Intrinsic(Intrinsic, Occur),
     ArrayOp(ArrayOp),
     IoOp(IoOp),
     Panic(
-        ob::Type, // Output type
-        Occur,    // Input
-    ),
-    Dup(
         ob::Type, // Output type
         Occur,    // Input
     ),
