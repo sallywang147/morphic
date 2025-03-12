@@ -52,6 +52,7 @@ pub enum Requirement {
     ArrayReplace(Type<Solution>),
     IoOp(IoOp),
     Panic(Type<Solution>),
+    Dup(Type<Solution>),
     Ctor(
         mono::CustomTypeId,
         IdVec<RepParamId, Solution>,

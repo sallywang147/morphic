@@ -24,6 +24,7 @@ pub enum Expr {
     ArrayOp(ArrayOp, mono::Type),
     IoOp(IoOp),
     Panic(mono::Type),
+    Dup(mono::Type),
     Ctor(mono::CustomTypeId, res::VariantId),
     Global(mono::CustomGlobalId),
     Local(LocalId),

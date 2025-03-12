@@ -14,6 +14,8 @@ fn add_expr_deps(expr: &mono::Expr, deps: &mut BTreeSet<mono::CustomGlobalId>) {
 
         mono::Expr::Panic(_) => {}
 
+        mono::Expr::Dup(_) => {}
+
         mono::Expr::Ctor(_, _) => {}
 
         mono::Expr::Global(other) => {
@@ -92,6 +94,8 @@ fn rebind_references(
         mono::Expr::IoOp(_) => {}
 
         mono::Expr::Panic(_) => {}
+
+        mono::Expr::Dup(_) => {}
 
         mono::Expr::Ctor(_, _) => {}
 

@@ -284,6 +284,7 @@ impl<'a, 'b> Context<'a, 'b> {
             Expr::ArrayOp(_, _) => Precedence::Var,
             Expr::IoOp(_) => Precedence::Var,
             Expr::Panic(_) => Precedence::Var,
+            Expr::Dup(_) => Precedence::Var,
             Expr::Ctor(_, _) => Precedence::Var,
             Expr::BoolLit(_) => Precedence::Var,
         };
@@ -480,6 +481,7 @@ impl<'a, 'b> Context<'a, 'b> {
                 IoOp::Output => self.write("output")?,
             },
             Expr::Panic(_type) => self.write("panic")?,
+            Expr::Dup(_type) => self.write("dup")?,
             Expr::Ctor(custom_type_id, variant_id) => {
                 self.write_variant(*custom_type_id, *variant_id)?;
             }
@@ -949,6 +951,7 @@ fn add_func_deps(deps: &mut BTreeSet<CustomGlobalId>, expr: &Expr) {
         Expr::ArrayOp(_, _) => {}
         Expr::IoOp(_) => {}
         Expr::Panic(_) => {}
+        Expr::Dup(_) => {}
         Expr::Ctor(_, _) => {}
         Expr::BoolLit(_) => {}
     }

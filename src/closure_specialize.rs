@@ -159,6 +159,14 @@ impl<'a> Context<'a> {
                     .insert(special::FuncCase::Panic(resolved_ret_type));
             }
 
+            annot::Requirement::Dup(ret_type) => {
+                let resolved_ret_type = self.resolve_type(ret_type, params);
+
+                target_cases
+                    .0
+                    .insert(special::FuncCase::Dup(resolved_ret_type));
+            }
+
             annot::Requirement::Ctor(custom, type_params, variant) => {
                 let resolved_type_params =
                     type_params.map_refs(|_, solution| self.resolve_solution(&solution, params));

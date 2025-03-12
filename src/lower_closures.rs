@@ -59,6 +59,10 @@ fn add_rep_leaves(
                 leaves.insert(LeafFuncCase::Panic(ret_type.clone()));
             }
 
+            special::FuncCase::Dup(ret_type) => {
+                leaves.insert(LeafFuncCase::Dup(ret_type.clone()));
+            }
+
             &special::FuncCase::Ctor(custom, variant) => {
                 leaves.insert(LeafFuncCase::Ctor(custom, variant));
             }

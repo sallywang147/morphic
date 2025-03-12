@@ -766,6 +766,7 @@ fn infer_expr(
     expected: TypeVar,
     expr: &res::Expr,
 ) -> Result<AnnotExpr, RawError> {
+    //println!("{:?}", expr);
     match expr {
         &res::Expr::Global(id) => {
             let scheme = global_scheme(program, id);
@@ -1056,9 +1057,9 @@ fn infer_def(
     let mut scope = Scope::new();
 
     let declared_type_var = instantiate_rigid(ctx, &def.scheme);
-
+    println!("{:?}", &def.body); 
     let body_annot = infer_expr(program, ctx, &mut scope, declared_type_var, &def.body)?;
-
+    println!("{:?}", body_annot); 
     let body_typed = extract_solution(ctx, body_annot)?;
 
     Ok(typed::ValDef {

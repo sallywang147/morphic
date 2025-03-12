@@ -46,6 +46,7 @@ pub enum FuncCase {
     ArrayReplace(Type),
     IoOp(IoOp),
     Panic(Type),
+    Dup(Type),
     Ctor(CustomTypeId, res::VariantId),
 }
 
